@@ -1,4 +1,5 @@
 import type { Handler } from "aws-lambda";
+import type { IncomingMessage } from "http";
 import * as https from "https";
 import * as querystring from "querystring";
 
@@ -92,9 +93,9 @@ function exchangeCodeForToken(code: string, redirectUri: string): Promise<TokenR
       },
     };
 
-    const req = https.request(options, (res: NodeJS.ReadableStream) => {
+    const req = https.request(options, (res: IncomingMessage) => {
       let data = "";
-      res.on("data", (chunk: Buffer) => (data += chunk));
+      res.on("data", (chunk: string | Buffer) => (data += chunk));
       res.on("end", () => {
         try {
           const parsed = JSON.parse(data);
