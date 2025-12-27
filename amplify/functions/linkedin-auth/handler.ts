@@ -92,9 +92,9 @@ function exchangeCodeForToken(code: string, redirectUri: string): Promise<TokenR
       },
     };
 
-    const req = https.request(options, (res) => {
+    const req = https.request(options, (res: NodeJS.ReadableStream) => {
       let data = "";
-      res.on("data", (chunk) => (data += chunk));
+      res.on("data", (chunk: Buffer) => (data += chunk));
       res.on("end", () => {
         try {
           const parsed = JSON.parse(data);
