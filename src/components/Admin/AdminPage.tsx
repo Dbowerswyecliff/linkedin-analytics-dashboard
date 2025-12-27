@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useBoardConfig, useSyncErrors } from '@/hooks/useMondayBoard'
+import { useConnectedEmployees } from '@/hooks/useLinkedInAnalytics'
 import LinkedInConnect from './LinkedInConnect'
+import EmployeeList from './EmployeeList'
 import SyncStatus from './SyncStatus'
 import ManualUpload from './ManualUpload'
 import './admin.css'
@@ -11,8 +13,11 @@ export default function AdminPage() {
     boardConfig?.weeklyTotalsBoardId ?? null,
     boardConfig?.postAnalyticsBoardId ?? null
   )
+  const { data: employeeData } = useConnectedEmployees()
   
-  const [activeTab, setActiveTab] = useState<'sync' | 'linkedin' | 'upload' | 'help'>('sync')
+  const [activeTab, setActiveTab] = useState<'employees' | 'connect' | 'sync' | 'upload' | 'help'>('employees')
+
+  const connectedCount = employeeData?.connectedCount || 0
 
   return (
     <div className="admin-page">
@@ -23,17 +28,24 @@ export default function AdminPage() {
 
       <div className="admin-tabs">
         <button
+          className={`tab-btn ${activeTab === 'employees' ? 'active' : ''}`}
+          onClick={() => setActiveTab('employees')}
+        >
+          Employees
+          {connectedCount > 0 && <span className="success-badge">{connectedCount}</span>}
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'connect' ? 'active' : ''}`}
+          onClick={() => setActiveTab('connect')}
+        >
+          Connect Account
+        </button>
+        <button
           className={`tab-btn ${activeTab === 'sync' ? 'active' : ''}`}
           onClick={() => setActiveTab('sync')}
         >
-          Sync Status
+          Board Sync
           {errors.length > 0 && <span className="error-badge">{errors.length}</span>}
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'linkedin' ? 'active' : ''}`}
-          onClick={() => setActiveTab('linkedin')}
-        >
-          LinkedIn
         </button>
         <button
           className={`tab-btn ${activeTab === 'upload' ? 'active' : ''}`}
@@ -50,11 +62,14 @@ export default function AdminPage() {
       </div>
 
       <div className="admin-content">
+        {activeTab === 'employees' && (
+          <EmployeeList />
+        )}
+        {activeTab === 'connect' && (
+          <LinkedInConnect />
+        )}
         {activeTab === 'sync' && (
           <SyncStatus errors={errors} isLoading={errorsLoading} />
-        )}
-        {activeTab === 'linkedin' && (
-          <LinkedInConnect />
         )}
         {activeTab === 'upload' && (
           <ManualUpload boardConfig={boardConfig} />

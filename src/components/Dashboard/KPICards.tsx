@@ -1,5 +1,13 @@
-import type { KPIData } from '@/types/analytics'
 import './kpi-cards.css'
+
+interface KPIData {
+  impressions: number;
+  reach: number;
+  engagements: number;
+  engagementRate: string;
+  employeeCount: number;
+  avgImpressions: number;
+}
 
 interface KPICardsProps {
   data: KPIData
@@ -15,48 +23,33 @@ function formatNumber(num: number): string {
   return num.toLocaleString()
 }
 
-function formatPercent(num: number): string {
-  return num.toFixed(2) + '%'
-}
-
-function TrendIndicator({ value }: { value: number }) {
-  if (value === 0) return null
-  
-  const isPositive = value > 0
-  return (
-    <span className={`trend ${isPositive ? 'positive' : 'negative'}`}>
-      {isPositive ? '↑' : '↓'} {Math.abs(value).toFixed(1)}%
-    </span>
-  )
-}
-
 export default function KPICards({ data }: KPICardsProps) {
   const cards = [
     {
       label: 'Total Impressions',
-      value: formatNumber(data.totalImpressions),
-      trend: data.impressionsTrend,
+      value: formatNumber(data.impressions),
+      subValue: `${formatNumber(data.avgImpressions)} avg/employee`,
       gradient: 'impressions',
       icon: '👁',
     },
     {
-      label: 'Members Reached',
-      value: formatNumber(data.totalReach),
-      trend: data.reachTrend,
+      label: 'Unique Views',
+      value: formatNumber(data.reach),
+      subValue: 'Members reached',
       gradient: 'reach',
       icon: '👥',
     },
     {
       label: 'Total Engagements',
-      value: formatNumber(data.totalEngagements),
-      trend: data.engagementsTrend,
+      value: formatNumber(data.engagements),
+      subValue: 'Reactions, comments, shares',
       gradient: 'engagements',
       icon: '💬',
     },
     {
       label: 'Engagement Rate',
-      value: formatPercent(data.engagementRate),
-      trend: data.rateTrend,
+      value: `${data.engagementRate}%`,
+      subValue: `${data.employeeCount} employees tracked`,
       gradient: 'rate',
       icon: '📈',
     },
@@ -76,7 +69,7 @@ export default function KPICards({ data }: KPICardsProps) {
               <span className="kpi-label">{card.label}</span>
             </div>
             <div className="kpi-value">{card.value}</div>
-            <TrendIndicator value={card.trend} />
+            <span className="kpi-sub-value">{card.subValue}</span>
           </div>
         </div>
       ))}

@@ -1,6 +1,11 @@
 import { format } from 'date-fns'
-import type { Employee } from '@/types/analytics'
 import './filters.css'
+
+interface Employee {
+  id: string;
+  name: string;
+  profilePicture?: string;
+}
 
 interface FiltersProps {
   employees: Employee[]
@@ -8,8 +13,8 @@ interface FiltersProps {
   onEmployeesChange: (ids: string[]) => void
   dateRange: { start: Date; end: Date }
   onDateRangeChange: (range: { start: Date; end: Date }) => void
-  viewMode: 'weekly' | 'posts'
-  onViewModeChange: (mode: 'weekly' | 'posts') => void
+  viewMode: 'weekly' | 'employees'
+  onViewModeChange: (mode: 'weekly' | 'employees') => void
 }
 
 export default function Filters({
@@ -40,15 +45,22 @@ export default function Filters({
         <label className="filter-label">Employees</label>
         <div className="employee-chips">
           {employees.length === 0 ? (
-            <span className="no-employees">No employees found</span>
+            <span className="no-employees">No employees connected yet</span>
           ) : (
             <>
               {employees.map((emp) => (
                 <button
                   key={emp.id}
-                  onClick={() => handleEmployeeToggle(emp.name)}
-                  className={`employee-chip ${selectedEmployees.includes(emp.name) ? 'selected' : ''}`}
+                  onClick={() => handleEmployeeToggle(emp.id)}
+                  className={`employee-chip ${selectedEmployees.includes(emp.id) ? 'selected' : ''}`}
                 >
+                  {emp.profilePicture && (
+                    <img 
+                      src={emp.profilePicture} 
+                      alt="" 
+                      className="chip-avatar"
+                    />
+                  )}
                   {emp.name}
                 </button>
               ))}
@@ -103,10 +115,10 @@ export default function Filters({
             Weekly
           </button>
           <button
-            onClick={() => onViewModeChange('posts')}
-            className={`toggle-btn ${viewMode === 'posts' ? 'active' : ''}`}
+            onClick={() => onViewModeChange('employees')}
+            className={`toggle-btn ${viewMode === 'employees' ? 'active' : ''}`}
           >
-            Posts
+            Employees
           </button>
         </div>
       </div>

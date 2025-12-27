@@ -1,73 +1,105 @@
 import { useState, useMemo } from 'react'
 import { format, subWeeks, startOfWeek, endOfWeek } from 'date-fns'
-import { useBoardConfig, useWeeklyTotals, usePostAnalytics, useEmployees } from '@/hooks/useMondayBoard'
-import { useKPIData, useChartData, useTopPosts } from '@/hooks/useAnalytics'
+import { 
+  useAllEmployeesAnalytics, 
+  useConnectedEmployees,
+  useSyncStatus,
+  aggregateAnalytics,
+  groupAnalyticsByWeek,
+  groupAnalyticsByEmployee,
+  formatSyncStatus,
+} from '@/hooks/useLinkedInAnalytics'
 import Filters from './Filters'
 import KPICards from './KPICards'
 import WeeklyChart from './WeeklyChart'
-import TopPostsChart from './TopPostsChart'
-import DataTable from './DataTable'
+import TopEmployeesChart from './TopEmployeesChart'
+import AnalyticsTable from './AnalyticsTable'
+import SyncStatusBanner from './SyncStatusBanner'
 import EmptyState from '../shared/EmptyState'
 import './dashboard.css'
 
 export default function Dashboard() {
-  const { data: boardConfig } = useBoardConfig()
-  
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
   const [dateRange, setDateRange] = useState(() => ({
     start: startOfWeek(subWeeks(new Date(), 8)),
     end: endOfWeek(new Date()),
   }))
-  const [viewMode, setViewMode] = useState<'weekly' | 'posts'>('weekly')
+  const [viewMode, setViewMode] = useState<'weekly' | 'employees'>('weekly')
 
-  const filters = useMemo(() => ({
-    employeeIds: selectedEmployees.length > 0 ? selectedEmployees : undefined,
-    startDate: format(dateRange.start, 'yyyy-MM-dd'),
-    endDate: format(dateRange.end, 'yyyy-MM-dd'),
-  }), [selectedEmployees, dateRange])
+  // Query parameters
+  const queryDateRange = useMemo(() => ({
+    start: format(dateRange.start, 'yyyy-MM-dd'),
+    end: format(dateRange.end, 'yyyy-MM-dd'),
+  }), [dateRange])
 
-  // Previous period for trend calculation
-  const prevFilters = useMemo(() => {
-    const duration = dateRange.end.getTime() - dateRange.start.getTime()
-    return {
-      employeeIds: selectedEmployees.length > 0 ? selectedEmployees : undefined,
-      startDate: format(new Date(dateRange.start.getTime() - duration), 'yyyy-MM-dd'),
-      endDate: format(new Date(dateRange.end.getTime() - duration), 'yyyy-MM-dd'),
-    }
-  }, [selectedEmployees, dateRange])
+  // Fetch analytics from DynamoDB
+  const { data: analyticsData, isLoading: analyticsLoading } = useAllEmployeesAnalytics(queryDateRange)
+  const { data: employeeData } = useConnectedEmployees()
+  const { data: syncData } = useSyncStatus()
 
-  const { data: employees = [] } = useEmployees(boardConfig?.weeklyTotalsBoardId ?? null)
-  const { data: weeklyData = [], isLoading: weeklyLoading } = useWeeklyTotals(
-    boardConfig?.weeklyTotalsBoardId ?? null,
-    filters
+  // Process analytics data
+  const analytics = analyticsData?.analytics || []
+  const employees = employeeData?.employees || []
+
+  // Filter by selected employees
+  const filteredAnalytics = useMemo(() => {
+    if (selectedEmployees.length === 0) return analytics
+    return analytics.filter(a => selectedEmployees.includes(a.mondayUserId))
+  }, [analytics, selectedEmployees])
+
+  // Aggregated KPIs
+  const aggregated = useMemo(() => aggregateAnalytics(filteredAnalytics), [filteredAnalytics])
+  
+  // Chart data
+  const weeklyChartData = useMemo(() => groupAnalyticsByWeek(filteredAnalytics), [filteredAnalytics])
+  const employeeRanking = useMemo(() => groupAnalyticsByEmployee(filteredAnalytics), [filteredAnalytics])
+
+  // Sync status
+  const syncStatus = formatSyncStatus(syncData?.latestSync || null)
+
+  // KPI cards data
+  const kpiData = useMemo(() => ({
+    impressions: aggregated.totalImpressions,
+    reach: aggregated.uniqueViews,
+    engagements: aggregated.totalEngagements,
+    engagementRate: aggregated.totalImpressions > 0 
+      ? ((aggregated.totalEngagements / aggregated.totalImpressions) * 100).toFixed(2)
+      : '0.00',
+    employeeCount: aggregated.employeeCount,
+    avgImpressions: aggregated.avgImpressionsPerEmployee,
+  }), [aggregated])
+
+  // Transform employees for filter dropdown
+  const employeeOptions = useMemo(() => 
+    employees.map(e => ({
+      id: e.mondayUserId,
+      name: e.displayName,
+      profilePicture: e.profilePicture,
+    })),
+    [employees]
   )
-  const { data: prevWeeklyData = [] } = useWeeklyTotals(
-    boardConfig?.weeklyTotalsBoardId ?? null,
-    prevFilters
-  )
-  const { data: postsData = [], isLoading: postsLoading } = usePostAnalytics(
-    boardConfig?.postAnalyticsBoardId ?? null,
-    filters
-  )
 
-  const kpiData = useKPIData(weeklyData, prevWeeklyData)
-  const chartData = useChartData(weeklyData)
-  const topPosts = useTopPosts(postsData)
-
-  const isLoading = weeklyLoading || postsLoading
-  const hasData = weeklyData.length > 0 || postsData.length > 0
+  const hasData = filteredAnalytics.length > 0
+  const isLoading = analyticsLoading
 
   return (
     <div className="dashboard">
       <header className="dashboard-header">
-        <h1>LinkedIn Analytics</h1>
-        <p className="dashboard-subtitle">
-          Track employee performance and engagement metrics
-        </p>
+        <div className="header-content">
+          <h1>LinkedIn Analytics</h1>
+          <p className="dashboard-subtitle">
+            Track employee performance and engagement metrics
+          </p>
+        </div>
+        <SyncStatusBanner 
+          status={syncStatus.label}
+          color={syncStatus.color}
+          lastSyncAgo={syncStatus.lastSyncAgo}
+        />
       </header>
 
       <Filters
-        employees={employees}
+        employees={employeeOptions}
         selectedEmployees={selectedEmployees}
         onEmployeesChange={setSelectedEmployees}
         dateRange={dateRange}
@@ -83,8 +115,8 @@ export default function Dashboard() {
         </div>
       ) : !hasData ? (
         <EmptyState
-          title="No data for this date range"
-          description="Try selecting a different date range or sync your LinkedIn data first."
+          title="No analytics data yet"
+          description="Connect LinkedIn accounts and sync data to see analytics here. Visit the Admin page to get started."
           icon="📊"
         />
       ) : (
@@ -92,22 +124,22 @@ export default function Dashboard() {
           <KPICards data={kpiData} />
 
           <div className="charts-grid">
-            <WeeklyChart data={chartData} />
-            <TopPostsChart posts={topPosts} />
+            <WeeklyChart data={weeklyChartData} />
+            <TopEmployeesChart employees={employeeRanking.slice(0, 5)} />
           </div>
 
           <div className="tables-section">
             {viewMode === 'weekly' ? (
-              <DataTable
-                title="Weekly Totals"
+              <AnalyticsTable
+                title="Weekly Breakdown"
+                data={weeklyChartData}
                 type="weekly"
-                data={weeklyData}
               />
             ) : (
-              <DataTable
-                title="Post Analytics"
-                type="posts"
-                data={postsData}
+              <AnalyticsTable
+                title="Employee Analytics"
+                data={employeeRanking}
+                type="employees"
               />
             )}
           </div>

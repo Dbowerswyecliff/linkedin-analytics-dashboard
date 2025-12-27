@@ -6,9 +6,14 @@
 
 .dashboard-header {
   animation: slideUp 0.4s ease-out;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
-.dashboard-header h1 {
+.header-content h1 {
   font-size: 1.75rem;
   font-weight: 700;
   color: var(--dash-text);
@@ -18,6 +23,53 @@
 .dashboard-subtitle {
   color: var(--dash-text-muted);
   font-size: 0.9375rem;
+}
+
+/* Sync Status Banner */
+.sync-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.sync-status-banner.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.sync-status-banner.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.sync-status-banner.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.sync-status-banner.info {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.status-icon {
+  display: flex;
+  align-items: center;
+}
+
+.status-text {
+  font-weight: 500;
+}
+
+.status-divider {
+  opacity: 0.5;
+}
+
+.status-time {
+  opacity: 0.8;
 }
 
 .dashboard-loading {

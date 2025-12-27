@@ -64,6 +64,15 @@
   border-radius: var(--radius-xl);
 }
 
+.success-badge {
+  background: #10b981;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-xl);
+}
+
 /* Admin content */
 .admin-content {
   animation: fadeIn 0.3s ease-out;

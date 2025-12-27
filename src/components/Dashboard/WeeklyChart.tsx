@@ -8,11 +8,19 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import type { ChartDataPoint } from '@/types/analytics'
 import './charts.css'
 
+interface WeeklyData {
+  week: string;
+  impressions: number;
+  engagements: number;
+  reactions: number;
+  comments: number;
+  shares: number;
+}
+
 interface WeeklyChartProps {
-  data: ChartDataPoint[]
+  data: WeeklyData[]
 }
 
 function formatYAxis(value: number): string {
@@ -21,12 +29,17 @@ function formatYAxis(value: number): string {
   return value.toString()
 }
 
+function formatWeekLabel(dateStr: string): string {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 export default function WeeklyChart({ data }: WeeklyChartProps) {
   if (data.length === 0) {
     return (
       <div className="chart-card">
         <div className="card-header">
-          <h3 className="card-title">📈 Impressions by Week</h3>
+          <h3 className="card-title">Impressions by Week</h3>
         </div>
         <div className="chart-empty">
           <p>No weekly data available</p>
@@ -35,14 +48,20 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
     )
   }
 
+  // Transform data for chart
+  const chartData = data.map(d => ({
+    ...d,
+    label: formatWeekLabel(d.week),
+  }))
+
   return (
     <div className="chart-card animate-slide-up stagger-2">
       <div className="card-header">
-        <h3 className="card-title">📈 Impressions by Week</h3>
+        <h3 className="card-title">Impressions by Week</h3>
       </div>
       <div className="chart-container">
         <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--dash-border)" />
             <XAxis 
               dataKey="label" 
@@ -64,6 +83,7 @@ export default function WeeklyChart({ data }: WeeklyChartProps) {
                 color: 'var(--dash-text)',
               }}
               labelStyle={{ color: 'var(--dash-text)', fontWeight: 600 }}
+              formatter={(value: number) => formatYAxis(value)}
             />
             <Legend 
               wrapperStyle={{ paddingTop: '20px' }}

@@ -86,6 +86,12 @@
   margin-bottom: var(--space-xs);
 }
 
+.kpi-sub-value {
+  font-size: 0.75rem;
+  color: var(--dash-text-muted);
+  display: block;
+}
+
 .trend {
   font-size: 0.8125rem;
   font-weight: 600;
