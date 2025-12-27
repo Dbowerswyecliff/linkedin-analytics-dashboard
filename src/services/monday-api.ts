@@ -48,11 +48,11 @@ const POST_COLUMNS = {
 export async function getContext(): Promise<{ boardId?: string; workspaceId?: string; userId?: number }> {
   return new Promise((resolve) => {
     monday.get('context').then((res) => {
-      const data = res.data as { boardId?: string; workspaceId?: string; user?: { id: number } } | undefined
+      const data = res.data as unknown as { boardId?: string; workspaceId?: string | number; user?: { id: number | string } } | undefined
       resolve({
         boardId: data?.boardId,
-        workspaceId: data?.workspaceId,
-        userId: data?.user?.id,
+        workspaceId: typeof data?.workspaceId === 'number' ? String(data.workspaceId) : data?.workspaceId,
+        userId: typeof data?.user?.id === 'string' ? parseInt(data.user.id, 10) : data?.user?.id,
       })
     })
   })
@@ -73,9 +73,11 @@ export async function getMondayUserId(): Promise<string> {
 
   return new Promise((resolve, reject) => {
     monday.get('context').then((res) => {
-      const data = res.data as { user?: { id: number } } | undefined
+      const data = res.data as unknown as { user?: { id: number | string } } | undefined
       if (data?.user?.id) {
-        resolve(String(data.user.id))
+        // Handle both number and string user IDs
+        const userId = typeof data.user.id === 'number' ? String(data.user.id) : data.user.id
+        resolve(userId)
       } else {
         reject(new Error('Could not get Monday.com user ID'))
       }
