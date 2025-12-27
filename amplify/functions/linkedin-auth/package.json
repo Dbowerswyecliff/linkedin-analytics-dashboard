@@ -1,8 +1,0 @@
-{
-  "name": "linkedin-auth",
-  "version": "1.0.0",
-  "description": "LinkedIn OAuth token exchange function",
-  "main": "index.js",
-  "type": "commonjs"
-}
-

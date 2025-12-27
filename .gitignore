@@ -31,3 +31,8 @@ npm-debug.log*
 # Testing
 coverage/
 
+
+# amplify
+.amplify
+amplify_outputs*
+amplifyconfiguration*
