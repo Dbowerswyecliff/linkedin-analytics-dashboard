@@ -3,7 +3,14 @@
  * Handles short-lived session tokens for browser authentication
  */
 
-import { DynamoDBClient, PutItemCommand, GetItemCommand, DeleteItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb';
+import { 
+  DynamoDBClient, 
+  PutItemCommand, 
+  GetItemCommand, 
+  DeleteItemCommand, 
+  QueryCommand,
+  type AttributeValue 
+} from '@aws-sdk/client-dynamodb';
 import { randomUUID } from 'crypto';
 
 const dynamodb = new DynamoDBClient({});

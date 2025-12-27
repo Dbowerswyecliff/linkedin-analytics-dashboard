@@ -3,7 +3,14 @@
  * Handles encrypted token storage in DynamoDB with auto-refresh
  */
 
-import { DynamoDBClient, PutItemCommand, GetItemCommand, DeleteItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
+import { 
+  DynamoDBClient, 
+  PutItemCommand, 
+  GetItemCommand, 
+  DeleteItemCommand, 
+  UpdateItemCommand,
+  type AttributeValue 
+} from '@aws-sdk/client-dynamodb';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import * as https from 'https';
 import * as querystring from 'querystring';
@@ -74,7 +81,7 @@ export async function storeTokens(
   const now = Date.now();
   const expiresAt = now + tokens.expires_in * 1000;
 
-  const item: Record<string, { S?: string; N?: string }> = {
+  const item: Record<string, AttributeValue> = {
     mondayUserId: { S: mondayUserId },
     accessToken: { S: encryptToken(tokens.access_token) },
     expiresAt: { N: String(expiresAt) },
@@ -245,7 +252,7 @@ async function updateTokensAfterRefresh(mondayUserId: string, tokens: LinkedInTo
   const expiresAt = now + tokens.expires_in * 1000;
 
   const updateExpression = 'SET accessToken = :at, expiresAt = :exp, lastRefreshed = :lr, updatedAt = :ua';
-  const expressionValues: Record<string, { S?: string; N?: string }> = {
+  const expressionValues: Record<string, AttributeValue> = {
     ':at': { S: encryptToken(tokens.access_token) },
     ':exp': { N: String(expiresAt) },
     ':lr': { N: String(now) },
@@ -275,7 +282,7 @@ async function updateTokensAfterRefresh(mondayUserId: string, tokens: LinkedInTo
 export async function updateProfile(mondayUserId: string, profile: LinkedInProfile): Promise<void> {
   const now = Date.now();
 
-  const expressionValues: Record<string, { S?: string; N?: string }> = {
+  const expressionValues: Record<string, AttributeValue> = {
     ':li': { S: profile.id },
     ':fn': { S: profile.firstName },
     ':ln': { S: profile.lastName },
