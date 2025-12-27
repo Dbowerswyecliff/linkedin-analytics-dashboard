@@ -43,7 +43,7 @@ export default function LinkedInConnect() {
     }
   }
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     if (!LINKEDIN_CLIENT_ID) {
       setError('LinkedIn Client ID is not configured. Please set VITE_LINKEDIN_CLIENT_ID in your environment.')
       return
@@ -53,9 +53,17 @@ export default function LinkedInConnect() {
     setError(null)
     
     try {
-      initiateLinkedInAuth()
+      const tokens = await initiateLinkedInAuth()
+      // Auth succeeded - load the profile
+      const profile = await fetchLinkedInProfile(tokens.access_token)
+      setConnectedAccounts([{
+        name: `${profile.firstName} ${profile.lastName}`,
+        email: profile.email || 'No email',
+        connectedAt: new Date().toLocaleDateString(),
+      }])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initiate LinkedIn auth')
+    } finally {
       setIsConnecting(false)
     }
   }

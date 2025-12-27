@@ -33,24 +33,70 @@ export interface LinkedInProfile {
 }
 
 /**
- * Generate LinkedIn OAuth URL and redirect user
+ * Generate LinkedIn OAuth URL and open in popup window
+ * Returns a Promise that resolves when auth completes
  */
-export function initiateLinkedInAuth(): void {
-  if (!LINKEDIN_CLIENT_ID) {
-    throw new Error('LinkedIn Client ID not configured');
-  }
+export function initiateLinkedInAuth(): Promise<LinkedInTokens> {
+  return new Promise((resolve, reject) => {
+    if (!LINKEDIN_CLIENT_ID) {
+      reject(new Error('LinkedIn Client ID not configured'));
+      return;
+    }
 
-  const state = crypto.randomUUID();
-  sessionStorage.setItem('linkedin_oauth_state', state);
+    const state = crypto.randomUUID();
+    sessionStorage.setItem('linkedin_oauth_state', state);
 
-  const authUrl = new URL('https://www.linkedin.com/oauth/v2/authorization');
-  authUrl.searchParams.set('response_type', 'code');
-  authUrl.searchParams.set('client_id', LINKEDIN_CLIENT_ID);
-  authUrl.searchParams.set('redirect_uri', LINKEDIN_REDIRECT_URI);
-  authUrl.searchParams.set('state', state);
-  authUrl.searchParams.set('scope', LINKEDIN_SCOPES);
+    const authUrl = new URL('https://www.linkedin.com/oauth/v2/authorization');
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('client_id', LINKEDIN_CLIENT_ID);
+    authUrl.searchParams.set('redirect_uri', LINKEDIN_REDIRECT_URI);
+    authUrl.searchParams.set('state', state);
+    authUrl.searchParams.set('scope', LINKEDIN_SCOPES);
 
-  window.location.href = authUrl.toString();
+    // Calculate popup position (centered)
+    const width = 600;
+    const height = 700;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    // Open popup window instead of redirecting (avoids iframe CSP issues)
+    const popup = window.open(
+      authUrl.toString(),
+      'linkedin-auth',
+      `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
+    );
+
+    if (!popup) {
+      reject(new Error('Failed to open popup. Please allow popups for this site.'));
+      return;
+    }
+
+    // Listen for message from popup
+    const handleMessage = (event: MessageEvent) => {
+      // Verify the message is from our popup
+      if (event.data?.type === 'linkedin-auth-success') {
+        window.removeEventListener('message', handleMessage);
+        clearInterval(popupCheckInterval);
+        storeLinkedInTokens(event.data.tokens);
+        resolve(event.data.tokens);
+      } else if (event.data?.type === 'linkedin-auth-error') {
+        window.removeEventListener('message', handleMessage);
+        clearInterval(popupCheckInterval);
+        reject(new Error(event.data.error || 'LinkedIn authentication failed'));
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Check if popup was closed without completing auth
+    const popupCheckInterval = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(popupCheckInterval);
+        window.removeEventListener('message', handleMessage);
+        reject(new Error('Authentication cancelled - popup was closed'));
+      }
+    }, 500);
+  });
 }
 
 /**
