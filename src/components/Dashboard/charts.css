@@ -1,0 +1,59 @@
+.chart-card {
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+}
+
+.chart-container {
+  margin-top: var(--space-md);
+}
+
+.chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--dash-text-muted);
+  font-style: italic;
+}
+
+/* Recharts overrides */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: var(--dash-border);
+}
+
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+.recharts-default-legend {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+}
+
+.recharts-legend-item {
+  display: flex !important;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.recharts-legend-item-text {
+  color: var(--dash-text-muted) !important;
+  font-size: 0.8125rem;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .chart-card {
+    padding: var(--space-md);
+  }
+  
+  .chart-container {
+    margin-left: -10px;
+    margin-right: -10px;
+  }
+}
+

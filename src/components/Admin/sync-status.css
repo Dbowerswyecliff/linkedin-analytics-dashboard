@@ -1,0 +1,244 @@
+.sync-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.sync-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-lg);
+}
+
+.sync-info h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--dash-text);
+  margin-bottom: var(--space-xs);
+}
+
+.sync-info p {
+  font-size: 0.9375rem;
+  color: var(--dash-text-muted);
+}
+
+.sync-now-btn {
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--dash-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.sync-now-btn:hover {
+  background: var(--li-blue);
+}
+
+/* Status cards */
+.status-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-md);
+}
+
+.status-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-lg);
+}
+
+.status-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.status-icon.success {
+  background: rgba(0, 186, 124, 0.15);
+  color: var(--dash-success);
+}
+
+.status-icon.error {
+  background: rgba(244, 33, 46, 0.15);
+  color: var(--dash-error);
+}
+
+.status-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.status-value {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--dash-text);
+}
+
+.status-label {
+  font-size: 0.8125rem;
+  color: var(--dash-text-muted);
+}
+
+/* Errors section */
+.errors-section {
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.errors-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--dash-border);
+}
+
+.errors-header h4 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--dash-text);
+}
+
+.error-count {
+  font-size: 0.8125rem;
+  color: var(--dash-error);
+  font-weight: 500;
+}
+
+.errors-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  color: var(--dash-text-muted);
+}
+
+.no-errors {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-xl);
+  text-align: center;
+}
+
+.check-icon {
+  font-size: 2rem;
+  margin-bottom: var(--space-md);
+}
+
+.no-errors p {
+  font-size: 1rem;
+  color: var(--dash-text);
+  font-weight: 500;
+}
+
+.no-errors .hint {
+  font-size: 0.875rem;
+  color: var(--dash-text-muted);
+  margin-top: var(--space-xs);
+}
+
+/* Errors table */
+.errors-list {
+  overflow-x: auto;
+}
+
+.errors-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.errors-table th {
+  text-align: left;
+  padding: var(--space-md) var(--space-lg);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--dash-text-muted);
+  background: var(--dash-surface-elevated);
+}
+
+.errors-table td {
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--dash-border);
+  color: var(--dash-text);
+}
+
+.errors-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.employee-cell {
+  font-weight: 500;
+}
+
+.board-cell {
+  color: var(--dash-text-muted);
+}
+
+.error-cell {
+  color: var(--dash-error);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time-cell {
+  color: var(--dash-text-muted);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.retry-btn {
+  padding: var(--space-xs) var(--space-md);
+  background: transparent;
+  border: 1px solid var(--dash-accent);
+  border-radius: var(--radius-md);
+  color: var(--dash-accent);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retry-btn:hover {
+  background: var(--dash-accent);
+  color: white;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .sync-header {
+    flex-direction: column;
+  }
+  
+  .sync-now-btn {
+    width: 100%;
+  }
+}
+

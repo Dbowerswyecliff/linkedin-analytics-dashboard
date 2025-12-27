@@ -1,0 +1,218 @@
+.admin-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.admin-header {
+  margin-bottom: var(--space-xl);
+}
+
+.admin-header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--dash-text);
+  margin-bottom: var(--space-xs);
+}
+
+.admin-header p {
+  color: var(--dash-text-muted);
+}
+
+/* Tabs */
+.admin-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xl);
+  border-bottom: 1px solid var(--dash-border);
+  padding-bottom: var(--space-xs);
+  overflow-x: auto;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  border: none;
+  background: transparent;
+  color: var(--dash-text-muted);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--dash-text);
+  background: var(--dash-surface);
+}
+
+.tab-btn.active {
+  color: var(--dash-accent);
+  background: var(--dash-surface);
+  border-bottom: 2px solid var(--dash-accent);
+}
+
+.error-badge {
+  background: var(--dash-error);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-xl);
+}
+
+/* Admin content */
+.admin-content {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Help section */
+.help-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.help-card {
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+}
+
+.help-card h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--dash-text);
+  margin-bottom: var(--space-md);
+}
+
+.help-card > p {
+  color: var(--dash-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.key-reference {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.key-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--dash-surface-elevated);
+  border-radius: var(--radius-md);
+}
+
+.key-item strong {
+  font-size: 0.875rem;
+  color: var(--dash-text);
+}
+
+.key-item code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.8125rem;
+  color: var(--dash-accent);
+  background: var(--dash-bg);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+}
+
+.key-item span {
+  font-size: 0.8125rem;
+  color: var(--dash-text-muted);
+}
+
+.help-steps {
+  list-style: none;
+  counter-reset: step;
+  margin-top: var(--space-md);
+}
+
+.help-steps li {
+  counter-increment: step;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  padding-left: var(--space-2xl);
+  position: relative;
+  border-left: 2px solid var(--dash-border);
+  margin-left: var(--space-md);
+}
+
+.help-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: -14px;
+  width: 24px;
+  height: 24px;
+  background: var(--dash-accent);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.help-steps li strong {
+  font-size: 0.9375rem;
+  color: var(--dash-text);
+}
+
+.help-steps li p {
+  font-size: 0.875rem;
+  color: var(--dash-text-muted);
+}
+
+.warning-text {
+  color: var(--dash-warning) !important;
+}
+
+.board-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.board-info > div {
+  padding: var(--space-md);
+  background: var(--dash-surface-elevated);
+  border-radius: var(--radius-md);
+}
+
+.board-info strong {
+  display: block;
+  font-size: 0.9375rem;
+  color: var(--dash-text);
+  margin-bottom: var(--space-xs);
+}
+
+.board-info p {
+  font-size: 0.8125rem;
+  color: var(--dash-text-muted);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .admin-tabs {
+    gap: 0;
+  }
+  
+  .tab-btn {
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.875rem;
+  }
+}
+

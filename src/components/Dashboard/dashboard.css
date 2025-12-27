@@ -1,0 +1,86 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.dashboard-header {
+  animation: slideUp 0.4s ease-out;
+}
+
+.dashboard-header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--dash-text);
+  margin-bottom: var(--space-xs);
+}
+
+.dashboard-subtitle {
+  color: var(--dash-text-muted);
+  font-size: 0.9375rem;
+}
+
+.dashboard-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  gap: var(--space-md);
+  color: var(--dash-text-muted);
+}
+
+/* Charts grid */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: var(--space-lg);
+}
+
+@media (max-width: 1024px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tables section */
+.tables-section {
+  margin-top: var(--space-md);
+}
+
+/* Card base style */
+.card {
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--dash-text);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .dashboard {
+    gap: var(--space-lg);
+  }
+  
+  .dashboard-header h1 {
+    font-size: 1.5rem;
+  }
+  
+  .card {
+    padding: var(--space-md);
+  }
+}
+

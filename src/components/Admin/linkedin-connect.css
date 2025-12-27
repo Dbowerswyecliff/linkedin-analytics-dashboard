@@ -1,0 +1,239 @@
+.linkedin-connect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.connect-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-lg);
+}
+
+.linkedin-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--li-blue);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.linkedin-icon svg {
+  width: 28px;
+  height: 28px;
+  color: white;
+}
+
+.connect-header h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--dash-text);
+  margin-bottom: var(--space-xs);
+}
+
+.connect-header p {
+  font-size: 0.9375rem;
+  color: var(--dash-text-muted);
+}
+
+/* Config warning */
+.config-warning {
+  display: flex;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: rgba(255, 173, 31, 0.1);
+  border: 1px solid rgba(255, 173, 31, 0.3);
+  border-radius: var(--radius-md);
+}
+
+.config-warning span {
+  font-size: 1.5rem;
+}
+
+.config-warning strong {
+  display: block;
+  color: var(--dash-warning);
+  font-size: 0.9375rem;
+  margin-bottom: var(--space-xs);
+}
+
+.config-warning p {
+  font-size: 0.875rem;
+  color: var(--dash-text-muted);
+}
+
+.config-warning code {
+  background: var(--dash-surface-elevated);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+}
+
+.config-warning a {
+  color: var(--dash-accent);
+}
+
+/* Connected accounts */
+.connected-accounts {
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.accounts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--dash-border);
+}
+
+.accounts-header h4 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--dash-text);
+}
+
+.account-count {
+  font-size: 0.8125rem;
+  color: var(--dash-text-muted);
+}
+
+.no-accounts {
+  padding: var(--space-xl);
+  text-align: center;
+}
+
+.no-accounts p {
+  color: var(--dash-text-muted);
+  font-size: 0.9375rem;
+}
+
+.no-accounts .hint {
+  font-size: 0.8125rem;
+  margin-top: var(--space-xs);
+}
+
+.accounts-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.account-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--dash-border);
+}
+
+.account-item:last-child {
+  border-bottom: none;
+}
+
+.account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-info strong {
+  font-size: 0.9375rem;
+  color: var(--dash-text);
+}
+
+.account-info span {
+  font-size: 0.8125rem;
+  color: var(--dash-text-muted);
+}
+
+.last-sync {
+  font-size: 0.75rem !important;
+  color: var(--dash-success) !important;
+}
+
+.disconnect-btn {
+  padding: var(--space-xs) var(--space-md);
+  background: transparent;
+  border: 1px solid var(--dash-error);
+  border-radius: var(--radius-md);
+  color: var(--dash-error);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.disconnect-btn:hover {
+  background: var(--dash-error);
+  color: white;
+}
+
+/* Connect button */
+.connect-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-xl);
+  background: var(--li-blue);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.connect-button:hover:not(:disabled) {
+  background: var(--li-blue-dark);
+}
+
+.connect-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* API notice */
+.api-notice {
+  padding: var(--space-lg);
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-lg);
+}
+
+.api-notice h4 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--dash-text);
+  margin-bottom: var(--space-sm);
+}
+
+.api-notice p {
+  font-size: 0.875rem;
+  color: var(--dash-text-muted);
+  line-height: 1.6;
+}
+
+.api-notice strong {
+  color: var(--dash-text);
+}
+

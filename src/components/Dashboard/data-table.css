@@ -1,0 +1,136 @@
+.table-card {
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.table-card .card-header {
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--dash-border);
+}
+
+.record-count {
+  font-size: 0.8125rem;
+  color: var(--dash-text-muted);
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.table-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  color: var(--dash-text-muted);
+  font-style: italic;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.data-table th {
+  text-align: left;
+  padding: var(--space-md) var(--space-lg);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--dash-text-muted);
+  background: var(--dash-surface-elevated);
+  white-space: nowrap;
+}
+
+.data-table th.num {
+  text-align: right;
+}
+
+.data-table td {
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--dash-border);
+  color: var(--dash-text);
+}
+
+.data-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table tbody tr:hover {
+  background: var(--dash-surface-elevated);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.employee-cell {
+  font-weight: 500;
+}
+
+.date-cell {
+  color: var(--dash-text-muted);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.post-cell a {
+  color: var(--dash-accent);
+  font-weight: 500;
+}
+
+.post-cell a:hover {
+  text-decoration: underline;
+}
+
+.no-link {
+  color: var(--dash-text-muted);
+  font-style: italic;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-xl);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-ok {
+  background: rgba(0, 186, 124, 0.15);
+  color: var(--dash-success);
+}
+
+.status-partial {
+  background: rgba(255, 173, 31, 0.15);
+  color: var(--dash-warning);
+}
+
+.status-error {
+  background: rgba(244, 33, 46, 0.15);
+  color: var(--dash-error);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .table-card .card-header {
+    padding: var(--space-md);
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: var(--space-sm) var(--space-md);
+  }
+  
+  .data-table {
+    font-size: 0.8125rem;
+  }
+}
+

@@ -1,0 +1,65 @@
+{
+  "name": "LinkedIn Employee Analytics Dashboard",
+  "short_name": "LinkedIn Analytics",
+  "description": "Track LinkedIn performance for multiple employees with weekly totals, post analytics, and engagement metrics",
+  "version": "1.0.0",
+  "vendor": "Your Company",
+  "developer": {
+    "name": "Your Name",
+    "url": "https://your-website.com"
+  },
+  "app_type": "feature",
+  "permissions": {
+    "account_access": "read",
+    "workspaces": {
+      "read": true,
+      "write": true
+    },
+    "boards": {
+      "read": true,
+      "write": true
+    },
+    "items": {
+      "read": true,
+      "write": true
+    },
+    "users": {
+      "read": true
+    },
+    "teams": {
+      "read": true
+    }
+  },
+  "features": {
+    "app_feature": {
+      "type": "AppFeature",
+      "name": "LinkedIn Analytics",
+      "description": "View employee LinkedIn performance dashboard",
+      "url": "/",
+      "icon": {
+        "type": "emoji",
+        "value": "📊"
+      }
+    }
+  },
+  "settings": {
+    "storage_key": "linkedin-analytics-settings"
+  },
+  "icon": {
+    "type": "url",
+    "url": "https://cdn.monday.com/images/apps/linkedin-icon.png"
+  },
+  "categories": [
+    "analytics",
+    "marketing",
+    "reporting"
+  ],
+  "monday_code": {
+    "deployment_type": "server-side",
+    "build": {
+      "command": "npm run build",
+      "output_directory": "dist"
+    }
+  }
+}
+
