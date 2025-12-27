@@ -57,8 +57,12 @@ export default function LinkedInCallback() {
             { type: 'linkedin-auth-error', error: message },
             window.location.origin
           )
-          // Close popup after a short delay
           setTimeout(() => window.close(), 2000)
+        } else {
+          // No opener - redirect to admin page after delay
+          setTimeout(() => {
+            window.location.href = '/admin'
+          }, 3000)
         }
         return
       }
@@ -75,6 +79,10 @@ export default function LinkedInCallback() {
             window.location.origin
           )
           setTimeout(() => window.close(), 2000)
+        } else {
+          setTimeout(() => {
+            window.location.href = '/admin'
+          }, 3000)
         }
         return
       }
@@ -96,6 +104,11 @@ export default function LinkedInCallback() {
           )
           // Close popup after a short delay
           setTimeout(() => window.close(), 1500)
+        } else {
+          // No opener (opened as tab, not popup) - redirect to admin page
+          setTimeout(() => {
+            window.location.href = '/admin'
+          }, 1500)
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to complete authentication'
@@ -108,6 +121,11 @@ export default function LinkedInCallback() {
             window.location.origin
           )
           setTimeout(() => window.close(), 2000)
+        } else {
+          // No opener - redirect to admin page after delay
+          setTimeout(() => {
+            window.location.href = '/admin'
+          }, 3000)
         }
       }
     }
@@ -167,7 +185,7 @@ export default function LinkedInCallback() {
             Successfully connected!
           </p>
           <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>
-            This window will close automatically...
+            {window.opener ? 'This window will close automatically...' : 'Redirecting to app...'}
           </p>
         </>
       )}
@@ -195,7 +213,7 @@ export default function LinkedInCallback() {
             {errorMessage}
           </p>
           <p style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '0.5rem' }}>
-            This window will close automatically...
+            {window.opener ? 'This window will close automatically...' : 'Redirecting to app...'}
           </p>
         </>
       )}
