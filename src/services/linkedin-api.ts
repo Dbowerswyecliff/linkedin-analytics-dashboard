@@ -1,7 +1,7 @@
 /**
  * LinkedIn API Service
- * Single OAuth flow using Community Management app
- * Provides both identity (r_basicprofile) and analytics (r_member_postAnalytics)
+ * Session-based authentication with server-side token storage
+ * Tokens are stored encrypted in DynamoDB - browser only stores session ID
  */
 
 // LinkedIn App (Community Management)
@@ -15,12 +15,10 @@ const LINKEDIN_SCOPES = [
   'r_basicprofile',          // Name, photo, headline
 ].join(' ');
 
-export interface LinkedInTokens {
-  access_token: string;
-  expires_in: number;
-  refresh_token?: string;
-  scope?: string;
-}
+// Session storage key
+const SESSION_STORAGE_KEY = 'linkedin_session';
+const OAUTH_STATE_KEY = 'linkedin_oauth_state';
+const OAUTH_STATE_TIMESTAMP_KEY = 'linkedin_oauth_state_timestamp';
 
 export interface LinkedInProfile {
   id: string;
@@ -30,19 +28,39 @@ export interface LinkedInProfile {
   headline?: string;
 }
 
+export interface SessionResponse {
+  sessionId: string;
+  profile: LinkedInProfile;
+  expiresIn: number;
+}
+
+export interface ConnectionStatus {
+  connected: boolean;
+  profile?: LinkedInProfile;
+  expiresAt?: number;
+  canRefresh?: boolean;
+  reason?: string;
+}
+
 /**
  * Initiate LinkedIn OAuth in a popup window
+ * mondayUserId is passed to the Lambda to associate tokens with the user
  */
-export function initiateLinkedInAuth(): Promise<LinkedInTokens> {
+export function initiateLinkedInAuth(mondayUserId: string): Promise<SessionResponse> {
   return new Promise((resolve, reject) => {
     if (!LINKEDIN_CLIENT_ID) {
       reject(new Error('LinkedIn Client ID not configured'));
       return;
     }
 
+    if (!mondayUserId) {
+      reject(new Error('Monday.com user ID is required'));
+      return;
+    }
+
     // Check if an OAuth flow is already in progress
-    const existingState = localStorage.getItem('linkedin_oauth_state');
-    const existingTimestamp = localStorage.getItem('linkedin_oauth_state_timestamp');
+    const existingState = localStorage.getItem(OAUTH_STATE_KEY);
+    const existingTimestamp = localStorage.getItem(OAUTH_STATE_TIMESTAMP_KEY);
     if (existingState && existingTimestamp) {
       const age = Date.now() - parseInt(existingTimestamp);
       if (age < 60000) { // Less than 1 minute old
@@ -52,16 +70,20 @@ export function initiateLinkedInAuth(): Promise<LinkedInTokens> {
       }
     }
 
-    // Generate new state token
-    const state = crypto.randomUUID();
+    // Generate new state token (includes mondayUserId for Lambda)
+    const stateData = {
+      nonce: crypto.randomUUID(),
+      mondayUserId,
+    };
+    const state = btoa(JSON.stringify(stateData));
     
     // Store state in localStorage so popup can access it
-    localStorage.setItem('linkedin_oauth_state', state);
-    localStorage.setItem('linkedin_oauth_state_timestamp', Date.now().toString());
+    localStorage.setItem(OAUTH_STATE_KEY, state);
+    localStorage.setItem(OAUTH_STATE_TIMESTAMP_KEY, Date.now().toString());
     
     console.log('[OAuth] State set:', {
-      state: state.substring(0, 8) + '...',
-      timestamp: Date.now(),
+      nonce: stateData.nonce.substring(0, 8) + '...',
+      mondayUserId,
     });
 
     const authUrl = new URL('https://www.linkedin.com/oauth/v2/authorization');
@@ -101,8 +123,12 @@ export function initiateLinkedInAuth(): Promise<LinkedInTokens> {
         console.log('[OAuth] Received success message from popup');
         window.removeEventListener('message', handleMessage);
         clearInterval(popupCheckInterval);
-        storeLinkedInTokens(event.data.tokens);
-        resolve(event.data.tokens);
+        
+        // Store session (not tokens!)
+        const sessionData = event.data.session as SessionResponse;
+        storeSession(sessionData.sessionId);
+        
+        resolve(sessionData);
       } else if (event.data?.type === 'linkedin-auth-error') {
         console.log('[OAuth] Received error message from popup:', event.data.error);
         window.removeEventListener('message', handleMessage);
@@ -125,25 +151,32 @@ export function initiateLinkedInAuth(): Promise<LinkedInTokens> {
 }
 
 /**
- * Handle OAuth callback - exchange code for token via serverless function
+ * Handle OAuth callback - exchange code for session via serverless function
  */
 export async function handleLinkedInCallback(
   code: string,
   state: string
-): Promise<LinkedInTokens> {
+): Promise<SessionResponse> {
   // Verify state to prevent CSRF
-  const savedState = localStorage.getItem('linkedin_oauth_state');
-  const stateTimestamp = localStorage.getItem('linkedin_oauth_state_timestamp');
+  const savedState = localStorage.getItem(OAUTH_STATE_KEY);
+  const stateTimestamp = localStorage.getItem(OAUTH_STATE_TIMESTAMP_KEY);
   
-  // Debug logging
-  console.log('[OAuth Debug]', {
-    receivedState: state.substring(0, 12) + '...',
-    savedState: savedState ? savedState.substring(0, 12) + '...' : 'null',
-    match: state === savedState,
-    timestamp: stateTimestamp,
-    age: stateTimestamp ? `${Math.round((Date.now() - parseInt(stateTimestamp)) / 1000)}s` : 'unknown',
-    allLocalStorageKeys: Object.keys(localStorage),
-  });
+  // Parse state to get mondayUserId
+  let mondayUserId: string;
+  try {
+    const stateData = JSON.parse(atob(state));
+    mondayUserId = stateData.mondayUserId;
+    
+    console.log('[OAuth Debug]', {
+      receivedNonce: stateData.nonce?.substring(0, 12) + '...',
+      mondayUserId,
+      stateMatch: state === savedState,
+      timestamp: stateTimestamp,
+      age: stateTimestamp ? `${Math.round((Date.now() - parseInt(stateTimestamp)) / 1000)}s` : 'unknown',
+    });
+  } catch {
+    throw new Error('Invalid OAuth state format');
+  }
   
   // If no saved state, this might be a duplicate attempt or the state was cleared
   if (!savedState) {
@@ -159,8 +192,8 @@ export async function handleLinkedInCallback(
   if (stateTimestamp) {
     const age = Date.now() - parseInt(stateTimestamp);
     if (age > 10 * 60 * 1000) {
-      localStorage.removeItem('linkedin_oauth_state');
-      localStorage.removeItem('linkedin_oauth_state_timestamp');
+      localStorage.removeItem(OAUTH_STATE_KEY);
+      localStorage.removeItem(OAUTH_STATE_TIMESTAMP_KEY);
       throw new Error('OAuth state expired. Please try connecting again.');
     }
   }
@@ -174,19 +207,22 @@ export async function handleLinkedInCallback(
   console.log('[OAuth] State validated successfully');
   
   // Clear the state after successful validation
-  localStorage.removeItem('linkedin_oauth_state');
-  localStorage.removeItem('linkedin_oauth_state_timestamp');
+  localStorage.removeItem(OAUTH_STATE_KEY);
+  localStorage.removeItem(OAUTH_STATE_TIMESTAMP_KEY);
 
-  // Exchange code for token via serverless function
+  // Exchange code for session via serverless function
+  // Now includes mondayUserId for server-side token storage
   const response = await fetch(LINKEDIN_AUTH_FUNCTION_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
+      action: 'token',
       code,
       redirect_uri: LINKEDIN_REDIRECT_URI,
       client_id: LINKEDIN_CLIENT_ID,
+      mondayUserId,
     }),
   });
 
@@ -199,10 +235,15 @@ export async function handleLinkedInCallback(
 }
 
 /**
- * Fetch user profile from LinkedIn via Lambda function
- * (Bypasses CORS by routing through server-side)
+ * Fetch user profile via Lambda (session-based)
  */
-export async function fetchLinkedInProfile(accessToken: string): Promise<LinkedInProfile> {
+export async function fetchLinkedInProfile(): Promise<LinkedInProfile> {
+  const sessionId = getSessionId();
+  
+  if (!sessionId) {
+    throw new Error('Not connected to LinkedIn');
+  }
+
   const response = await fetch(LINKEDIN_AUTH_FUNCTION_URL, {
     method: 'POST',
     headers: {
@@ -210,12 +251,18 @@ export async function fetchLinkedInProfile(accessToken: string): Promise<LinkedI
     },
     body: JSON.stringify({
       action: 'profile',
-      access_token: accessToken,
+      sessionId,
     }),
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Failed to fetch profile' }));
+    
+    // If session is invalid, clear it
+    if (response.status === 401) {
+      clearSession();
+    }
+    
     throw new Error(error.error || 'Failed to fetch LinkedIn profile');
   }
 
@@ -223,104 +270,216 @@ export async function fetchLinkedInProfile(accessToken: string): Promise<LinkedI
 }
 
 /**
- * Fetch post analytics for the authenticated member
+ * Check connection status via Lambda
  */
-export async function fetchMemberPostAnalytics(
-  accessToken: string,
-  startDate?: Date,
-  endDate?: Date
-): Promise<unknown> {
-  const params = new URLSearchParams({
-    q: 'me',
-    queryType: 'IMPRESSION',
-    aggregation: 'DAILY',
+export async function checkConnectionStatus(): Promise<ConnectionStatus> {
+  const sessionId = getSessionId();
+  
+  if (!sessionId) {
+    return { connected: false, reason: 'no_session' };
+  }
+
+  try {
+    const response = await fetch(LINKEDIN_AUTH_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'status',
+        sessionId,
+      }),
+    });
+
+    if (!response.ok) {
+      // If server error, assume not connected
+      clearSession();
+      return { connected: false, reason: 'server_error' };
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('[LinkedIn] Failed to check status:', error);
+    return { connected: false, reason: 'network_error' };
+  }
+}
+
+/**
+ * Disconnect LinkedIn (delete tokens from server)
+ */
+export async function disconnectLinkedIn(): Promise<void> {
+  const sessionId = getSessionId();
+  
+  if (!sessionId) {
+    return; // Already disconnected
+  }
+
+  try {
+    await fetch(LINKEDIN_AUTH_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'disconnect',
+        sessionId,
+      }),
+    });
+  } catch (error) {
+    console.error('[LinkedIn] Failed to disconnect:', error);
+  } finally {
+    // Always clear local session
+    clearSession();
+  }
+}
+
+/**
+ * Fetch post analytics via Lambda (handles token refresh automatically)
+ */
+export async function fetchMemberPostAnalytics(): Promise<unknown> {
+  const sessionId = getSessionId();
+  
+  if (!sessionId) {
+    throw new Error('Not connected to LinkedIn');
+  }
+
+  const response = await fetch(LINKEDIN_AUTH_FUNCTION_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      action: 'analytics',
+      sessionId,
+    }),
   });
 
-  if (startDate) {
-    params.set('startDate.day', String(startDate.getDate()));
-    params.set('startDate.month', String(startDate.getMonth() + 1));
-    params.set('startDate.year', String(startDate.getFullYear()));
-  }
-
-  if (endDate) {
-    params.set('endDate.day', String(endDate.getDate()));
-    params.set('endDate.month', String(endDate.getMonth() + 1));
-    params.set('endDate.year', String(endDate.getFullYear()));
-  }
-
-  const response = await fetch(
-    `https://api.linkedin.com/rest/memberCreatorPostAnalytics?${params.toString()}`,
-    {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'LinkedIn-Version': '202401',
-        'X-Restli-Protocol-Version': '2.0.0',
-      },
-    }
-  );
-
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error('LinkedIn API error:', errorText);
-    throw new Error('Failed to fetch post analytics');
+    const error = await response.json().catch(() => ({ error: 'Failed to fetch analytics' }));
+    
+    // If session is invalid, clear it
+    if (response.status === 401) {
+      clearSession();
+    }
+    
+    throw new Error(error.error || 'Failed to fetch post analytics');
   }
 
   return response.json();
 }
 
 /**
- * Store LinkedIn tokens securely
+ * Refresh session (extend TTL)
  */
-export function storeLinkedInTokens(tokens: LinkedInTokens): void {
-  const expiresAt = Date.now() + (tokens.expires_in * 1000);
-  const tokenData = {
-    ...tokens,
-    expiresAt,
-  };
-  localStorage.setItem('linkedin_tokens', JSON.stringify(tokenData));
-}
-
-/**
- * Get stored LinkedIn tokens
- */
-export function getLinkedInTokens(): (LinkedInTokens & { expiresAt: number }) | null {
-  const stored = localStorage.getItem('linkedin_tokens');
-  if (!stored) return null;
+export async function refreshSession(): Promise<string | null> {
+  const sessionId = getSessionId();
   
+  if (!sessionId) {
+    return null;
+  }
+
   try {
-    const tokens = JSON.parse(stored);
-    // Check if expired
-    if (tokens.expiresAt && tokens.expiresAt < Date.now()) {
-      localStorage.removeItem('linkedin_tokens');
+    const response = await fetch(LINKEDIN_AUTH_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'refresh',
+        sessionId,
+      }),
+    });
+
+    if (!response.ok) {
+      clearSession();
       return null;
     }
-    return tokens;
-  } catch {
+
+    const data = await response.json();
+    if (data.sessionId) {
+      storeSession(data.sessionId);
+      return data.sessionId;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('[LinkedIn] Failed to refresh session:', error);
     return null;
   }
 }
 
+// ============================================================================
+// Session Storage (Browser only stores session ID, not tokens)
+// ============================================================================
+
 /**
- * Clear LinkedIn tokens (logout)
+ * Store session ID in localStorage
  */
-export function clearLinkedInTokens(): void {
-  localStorage.removeItem('linkedin_tokens');
+export function storeSession(sessionId: string): void {
+  localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+  console.log('[LinkedIn] Session stored');
 }
 
 /**
- * Check if user is connected to LinkedIn
+ * Get session ID from localStorage
+ */
+export function getSessionId(): string | null {
+  return localStorage.getItem(SESSION_STORAGE_KEY);
+}
+
+/**
+ * Clear session from localStorage
+ */
+export function clearSession(): void {
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+  console.log('[LinkedIn] Session cleared');
+}
+
+/**
+ * Check if user has a session (may or may not be valid)
+ */
+export function hasSession(): boolean {
+  return getSessionId() !== null;
+}
+
+// ============================================================================
+// Legacy compatibility - kept for migration support
+// ============================================================================
+
+/**
+ * @deprecated Use hasSession() instead
  */
 export function isLinkedInConnected(): boolean {
-  return getLinkedInTokens() !== null;
+  return hasSession();
 }
 
 /**
- * Debug helper: Clear all OAuth state
- * Use this when troubleshooting OAuth issues
+ * @deprecated Tokens are no longer stored in browser
+ */
+export function getLinkedInTokens(): null {
+  // Migration: if old tokens exist, clear them
+  const oldTokens = localStorage.getItem('linkedin_tokens');
+  if (oldTokens) {
+    localStorage.removeItem('linkedin_tokens');
+    console.log('[LinkedIn] Cleared legacy tokens from localStorage');
+  }
+  return null;
+}
+
+/**
+ * @deprecated Use clearSession() instead
+ */
+export function clearLinkedInTokens(): void {
+  clearSession();
+}
+
+/**
+ * Clear all LinkedIn data from localStorage
  */
 export function clearAllLinkedInData(): void {
-  localStorage.removeItem('linkedin_tokens');
-  localStorage.removeItem('linkedin_oauth_state');
-  localStorage.removeItem('linkedin_oauth_state_timestamp');
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+  localStorage.removeItem(OAUTH_STATE_KEY);
+  localStorage.removeItem(OAUTH_STATE_TIMESTAMP_KEY);
+  localStorage.removeItem('linkedin_tokens'); // Legacy cleanup
   console.log('[LinkedIn] All data cleared');
 }

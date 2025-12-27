@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
 import { 
   initiateLinkedInAuth,
-  getLinkedInTokens,
-  clearLinkedInTokens,
+  checkConnectionStatus,
+  disconnectLinkedIn,
   fetchLinkedInProfile,
-  isLinkedInConnected,
+  hasSession,
+  clearAllLinkedInData,
   type LinkedInProfile,
+  type ConnectionStatus as ApiConnectionStatus,
 } from '@/services/linkedin-api'
+import { getMondayUserId } from '@/services/monday-api'
 import './linkedin-connect.css'
 
 const LINKEDIN_CLIENT_ID = import.meta.env.VITE_LINKEDIN_CLIENT_ID || ''
@@ -15,11 +18,13 @@ interface ConnectionStatus {
   connected: boolean;
   profile?: LinkedInProfile;
   connectedAt?: string;
+  canRefresh?: boolean;
 }
 
 export default function LinkedInConnect() {
   const [status, setStatus] = useState<ConnectionStatus>({ connected: false })
   const [isConnecting, setIsConnecting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -27,34 +32,35 @@ export default function LinkedInConnect() {
   }, [])
 
   const loadConnectionStatus = async () => {
-    if (!isLinkedInConnected()) {
+    setIsLoading(true)
+    
+    // First check if we have a session locally
+    if (!hasSession()) {
       setStatus({ connected: false })
+      setIsLoading(false)
       return
     }
 
-    const tokens = getLinkedInTokens()
-    if (!tokens) return
-
     try {
-      const profile = await fetchLinkedInProfile(tokens.access_token)
-      setStatus({
-        connected: true,
-        profile,
-        connectedAt: new Date(tokens.expiresAt - (tokens.expires_in * 1000)).toLocaleDateString(),
-      })
-    } catch (err) {
-      console.warn('[Admin] Failed to load profile (Lambda not deployed?), showing connection without profile:', err)
+      // Check status with server (validates session and token)
+      const serverStatus: ApiConnectionStatus = await checkConnectionStatus()
       
-      // Still show as connected even if profile fetch fails
-      setStatus({
-        connected: true,
-        profile: {
-          id: 'unknown',
-          firstName: 'LinkedIn',
-          lastName: 'User',
-        },
-        connectedAt: new Date(tokens.expiresAt - (tokens.expires_in * 1000)).toLocaleDateString(),
-      })
+      if (serverStatus.connected) {
+        setStatus({
+          connected: true,
+          profile: serverStatus.profile,
+          canRefresh: serverStatus.canRefresh,
+        })
+      } else {
+        // Session or tokens are invalid
+        setStatus({ connected: false })
+        clearAllLinkedInData()
+      }
+    } catch (err) {
+      console.warn('[Admin] Failed to check connection status:', err)
+      setStatus({ connected: false })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -68,32 +74,19 @@ export default function LinkedInConnect() {
     setError(null)
     
     try {
-      const tokens = await initiateLinkedInAuth()
-      console.log('[Admin] Got tokens, attempting to fetch profile...')
+      // Get Monday.com user ID first
+      const mondayUserId = await getMondayUserId()
+      console.log('[Admin] Monday user ID:', mondayUserId)
       
-      try {
-        const profile = await fetchLinkedInProfile(tokens.access_token)
-        console.log('[Admin] Profile fetched successfully:', profile)
-        
-        setStatus({
-          connected: true,
-          profile,
-          connectedAt: new Date().toLocaleDateString(),
-        })
-      } catch (profileErr) {
-        console.warn('[Admin] Profile fetch failed (Lambda not deployed?), showing connection without profile:', profileErr)
-        
-        // Still show as connected even if profile fetch fails
-        setStatus({
-          connected: true,
-          profile: {
-            id: 'unknown',
-            firstName: 'LinkedIn',
-            lastName: 'User',
-          },
-          connectedAt: new Date().toLocaleDateString(),
-        })
-      }
+      // Initiate OAuth flow with Monday user ID
+      const session = await initiateLinkedInAuth(mondayUserId)
+      console.log('[Admin] OAuth complete, session created')
+      
+      setStatus({
+        connected: true,
+        profile: session.profile,
+        connectedAt: new Date().toLocaleDateString(),
+      })
     } catch (err) {
       console.error('[Admin] OAuth failed:', err)
       setError(err instanceof Error ? err.message : 'Failed to connect LinkedIn')
@@ -102,9 +95,48 @@ export default function LinkedInConnect() {
     }
   }
 
-  const handleDisconnect = () => {
-    clearLinkedInTokens()
+  const handleDisconnect = async () => {
+    try {
+      await disconnectLinkedIn()
+    } catch (err) {
+      console.error('[Admin] Failed to disconnect:', err)
+    }
     setStatus({ connected: false })
+  }
+
+  const handleRefreshProfile = async () => {
+    try {
+      const profile = await fetchLinkedInProfile()
+      setStatus(prev => ({
+        ...prev,
+        profile,
+      }))
+    } catch (err) {
+      console.error('[Admin] Failed to refresh profile:', err)
+      setError('Failed to refresh profile. You may need to reconnect.')
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="linkedin-connect">
+        <div className="connect-header">
+          <div className="linkedin-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
+            </svg>
+          </div>
+          <div>
+            <h3>LinkedIn Integration</h3>
+            <p>Checking connection status...</p>
+          </div>
+        </div>
+        <div className="loading-state">
+          <div className="button-spinner" />
+          Loading...
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -168,12 +200,21 @@ export default function LinkedInConnect() {
                 )}
               </div>
             </div>
-            <button 
-              onClick={handleDisconnect}
-              className="disconnect-btn"
-            >
-              Disconnect
-            </button>
+            <div className="connected-actions">
+              <button 
+                onClick={handleRefreshProfile}
+                className="refresh-btn"
+                title="Refresh profile info"
+              >
+                🔄
+              </button>
+              <button 
+                onClick={handleDisconnect}
+                className="disconnect-btn"
+              >
+                Disconnect
+              </button>
+            </div>
           </div>
         ) : (
           <button 
@@ -212,7 +253,8 @@ export default function LinkedInConnect() {
           <li><strong>Access post analytics:</strong> Impressions, engagement, reach</li>
         </ul>
         <p>
-          Your credentials are securely stored and you can disconnect at any time.
+          Your credentials are securely stored on our server (encrypted) and you can disconnect at any time.
+          Tokens automatically refresh before they expire.
         </p>
       </div>
     </div>

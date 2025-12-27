@@ -1,11 +1,17 @@
 import { useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { handleLinkedInCallback } from '@/services/linkedin-api'
+import { handleLinkedInCallback, storeSession } from '@/services/linkedin-api'
 
 /**
  * LinkedIn OAuth Callback Handler
  * This page handles the OAuth redirect from LinkedIn.
- * It exchanges the authorization code for tokens and posts the result back to the opener window.
+ * It exchanges the authorization code for a session and posts the result back to the opener window.
+ * 
+ * New flow with DynamoDB:
+ * 1. LinkedIn redirects here with code and state
+ * 2. We call Lambda to exchange code for tokens
+ * 3. Lambda stores tokens in DynamoDB (encrypted) and returns a session ID + profile
+ * 4. We store the session ID locally and post the result to the opener
  */
 export default function LinkedInCallback() {
   const [searchParams] = useSearchParams()
@@ -37,7 +43,6 @@ export default function LinkedInCallback() {
         state: state?.substring(0, 10) + '...', 
         error,
         localStorageState: localStorage.getItem('linkedin_oauth_state')?.substring(0, 10) + '...',
-        localStorageKeys: Object.keys(localStorage),
       })
 
       // Handle LinkedIn error response
@@ -75,15 +80,18 @@ export default function LinkedInCallback() {
       }
 
       try {
-        // Exchange code for tokens
-        const tokens = await handleLinkedInCallback(code, state)
+        // Exchange code for session (tokens stored server-side)
+        const session = await handleLinkedInCallback(code, state)
+        
+        // Store session ID locally
+        storeSession(session.sessionId)
         
         setStatus('success')
         
-        // Post success to opener window
+        // Post success to opener window with session (NOT tokens)
         if (window.opener) {
           window.opener.postMessage(
-            { type: 'linkedin-auth-success', tokens },
+            { type: 'linkedin-auth-success', session },
             window.location.origin
           )
           // Close popup after a short delay
@@ -194,4 +202,3 @@ export default function LinkedInCallback() {
     </div>
   )
 }
-

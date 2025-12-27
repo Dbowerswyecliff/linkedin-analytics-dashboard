@@ -45,12 +45,41 @@ const POST_COLUMNS = {
   postKey: 'post_key',
 }
 
-export async function getContext(): Promise<{ boardId?: string; workspaceId?: string }> {
+export async function getContext(): Promise<{ boardId?: string; workspaceId?: string; userId?: number }> {
   return new Promise((resolve) => {
     monday.get('context').then((res) => {
-      const data = res.data as { boardId?: string; workspaceId?: string } | undefined
-      resolve(data || {})
+      const data = res.data as { boardId?: string; workspaceId?: string; user?: { id: number } } | undefined
+      resolve({
+        boardId: data?.boardId,
+        workspaceId: data?.workspaceId,
+        userId: data?.user?.id,
+      })
     })
+  })
+}
+
+/**
+ * Get the current Monday.com user ID
+ * Used to associate LinkedIn tokens with the user
+ */
+export async function getMondayUserId(): Promise<string> {
+  // In dev mode outside Monday, use a mock user ID
+  if (isDev && !isInsideMonday()) {
+    const devUserId = localStorage.getItem('dev-mondayUserId') || 'dev-user-' + Date.now()
+    localStorage.setItem('dev-mondayUserId', devUserId)
+    console.log('[DEV] Using mock Monday user ID:', devUserId)
+    return devUserId
+  }
+
+  return new Promise((resolve, reject) => {
+    monday.get('context').then((res) => {
+      const data = res.data as { user?: { id: number } } | undefined
+      if (data?.user?.id) {
+        resolve(String(data.user.id))
+      } else {
+        reject(new Error('Could not get Monday.com user ID'))
+      }
+    }).catch(reject)
   })
 }
 

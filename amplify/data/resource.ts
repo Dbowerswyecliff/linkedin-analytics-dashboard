@@ -1,17 +1,57 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 
-/*== STEP 1 ===============================================================
-The section below creates a Todo database table with a "content" field. Try
-adding a new "isDone" field as a boolean. The authorization rule below
-specifies that any unauthenticated user can "create", "read", "update", 
-and "delete" any "Todo" records.
-=========================================================================*/
+/**
+ * LinkedIn Token Storage Schema
+ * 
+ * Two tables:
+ * 1. LinkedInTokens - Stores encrypted LinkedIn tokens per Monday.com user
+ * 2. UserSessions - Short-lived session tokens for browser authentication
+ */
 const schema = a.schema({
-  Todo: a
+  /**
+   * LinkedInTokens Table
+   * Primary Key: mondayUserId (Monday.com user ID)
+   * Stores encrypted LinkedIn OAuth tokens with auto-refresh support
+   */
+  LinkedInTokens: a
     .model({
-      content: a.string(),
+      mondayUserId: a.string().required(),           // Monday.com user ID (PK)
+      linkedInId: a.string(),                         // LinkedIn profile ID (urn:li:person:xxx)
+      accessToken: a.string().required(),             // Encrypted access token
+      refreshToken: a.string(),                       // Encrypted refresh token
+      expiresAt: a.integer().required(),              // Token expiry timestamp (ms)
+      lastRefreshed: a.integer(),                     // Last refresh timestamp (ms)
+      profileFirstName: a.string(),                   // Cached profile: first name
+      profileLastName: a.string(),                    // Cached profile: last name
+      profileHeadline: a.string(),                    // Cached profile: headline
+      profilePicture: a.string(),                     // Cached profile: picture URL
+      createdAt: a.integer().required(),              // Connection timestamp
+      updatedAt: a.integer().required(),              // Last update timestamp
     })
-    .authorization((allow) => [allow.guest()]),
+    .identifier(['mondayUserId'])
+    .authorization((allow) => [
+      allow.guest().to(['read']),                     // Lambda uses IAM, not guest
+    ]),
+
+  /**
+   * UserSessions Table
+   * Primary Key: sessionId (UUID)
+   * Short-lived sessions (24 hours) for browser authentication
+   */
+  UserSessions: a
+    .model({
+      sessionId: a.string().required(),               // UUID session identifier (PK)
+      mondayUserId: a.string().required(),            // Monday.com user ID (for lookup)
+      expiresAt: a.integer().required(),              // Session expiry timestamp (ms)
+      createdAt: a.integer().required(),              // Session creation timestamp
+    })
+    .identifier(['sessionId'])
+    .secondaryIndexes((index) => [
+      index('mondayUserId'),                          // GSI for user lookup
+    ])
+    .authorization((allow) => [
+      allow.guest().to(['read']),
+    ]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
@@ -19,35 +59,6 @@ export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
   schema,
   authorizationModes: {
-    defaultAuthorizationMode: 'identityPool',
+    defaultAuthorizationMode: 'iam',                  // Lambda uses IAM authentication
   },
 });
-
-/*== STEP 2 ===============================================================
-Go to your frontend source code. From your client-side code, generate a
-Data client to make CRUDL requests to your table. (THIS SNIPPET WILL ONLY
-WORK IN THE FRONTEND CODE FILE.)
-
-Using JavaScript or Next.js React Server Components, Middleware, Server 
-Actions or Pages Router? Review how to generate Data clients for those use
-cases: https://docs.amplify.aws/gen2/build-a-backend/data/connect-to-API/
-=========================================================================*/
-
-/*
-"use client"
-import { generateClient } from "aws-amplify/data";
-import type { Schema } from "@/amplify/data/resource";
-
-const client = generateClient<Schema>() // use this Data client for CRUDL requests
-*/
-
-/*== STEP 3 ===============================================================
-Fetch records from the database and use them in your frontend component.
-(THIS SNIPPET WILL ONLY WORK IN THE FRONTEND CODE FILE.)
-=========================================================================*/
-
-/* For example, in a React component, you can use this snippet in your
-  function's RETURN statement */
-// const { data: todos } = await client.models.Todo.list()
-
-// return <ul>{todos.map(todo => <li key={todo.id}>{todo.content}</li>)}</ul>
