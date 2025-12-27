@@ -10,6 +10,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.958.0",
     "@tanstack/react-query": "^5.60.0",
     "@vibe/core": "^3.82.3",
     "@vibe/icons": "^1.15.0",
