@@ -2,7 +2,7 @@ import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { linkedinAuth } from './functions/linkedin-auth/resource';
-import { FunctionUrlAuthType } from 'aws-cdk-lib/aws-lambda';
+import { FunctionUrlAuthType, HttpMethod } from 'aws-cdk-lib/aws-lambda';
 
 /**
  * @see https://docs.amplify.aws/react/build-a-backend/ to add storage, functions, and more
@@ -20,7 +20,7 @@ const fnUrl = linkedinAuthLambda.addFunctionUrl({
   cors: {
     allowedOrigins: ['*'],
     allowedHeaders: ['Content-Type'],
-    allowedMethods: ['POST', 'OPTIONS'],
+    allowedMethods: [HttpMethod.POST, HttpMethod.OPTIONS],
   },
 });
 
