@@ -1,20 +1,18 @@
 /**
  * LinkedIn API Service
- * Handles OAuth flow and API calls
+ * Single OAuth flow using Community Management app
+ * Provides both identity (r_basicprofile) and analytics (r_member_postAnalytics)
  */
 
+// LinkedIn App (Community Management)
 const LINKEDIN_CLIENT_ID = import.meta.env.VITE_LINKEDIN_CLIENT_ID || '';
 const LINKEDIN_REDIRECT_URI = import.meta.env.VITE_LINKEDIN_REDIRECT_URI || `${window.location.origin}/auth/linkedin/callback`;
 const LINKEDIN_AUTH_FUNCTION_URL = import.meta.env.VITE_LINKEDIN_AUTH_FUNCTION_URL || '/api/linkedin-auth';
 
-// LinkedIn OAuth scopes
-// Note: Analytics scopes require Marketing Developer Platform access
+// Scopes for Community Management app
 const LINKEDIN_SCOPES = [
-  'openid',
-  'profile', 
-  'email',
-  // 'r_organization_social', // Requires Marketing API access
-  // 'r_1st_connections_size', // Requires Marketing API access
+  'r_member_postAnalytics',  // Post analytics
+  'r_basicprofile',          // Name, photo, headline
 ].join(' ');
 
 export interface LinkedInTokens {
@@ -28,13 +26,12 @@ export interface LinkedInProfile {
   id: string;
   firstName: string;
   lastName: string;
-  email?: string;
   profilePicture?: string;
+  headline?: string;
 }
 
 /**
- * Generate LinkedIn OAuth URL and open in popup window
- * Returns a Promise that resolves when auth completes
+ * Initiate LinkedIn OAuth in a popup window
  */
 export function initiateLinkedInAuth(): Promise<LinkedInTokens> {
   return new Promise((resolve, reject) => {
@@ -59,7 +56,7 @@ export function initiateLinkedInAuth(): Promise<LinkedInTokens> {
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
 
-    // Open popup window instead of redirecting (avoids iframe CSP issues)
+    // Open popup window
     const popup = window.open(
       authUrl.toString(),
       'linkedin-auth',
@@ -73,7 +70,6 @@ export function initiateLinkedInAuth(): Promise<LinkedInTokens> {
 
     // Listen for message from popup
     const handleMessage = (event: MessageEvent) => {
-      // Verify the message is from our popup
       if (event.data?.type === 'linkedin-auth-success') {
         window.removeEventListener('message', handleMessage);
         clearInterval(popupCheckInterval);
@@ -102,7 +98,10 @@ export function initiateLinkedInAuth(): Promise<LinkedInTokens> {
 /**
  * Handle OAuth callback - exchange code for token via serverless function
  */
-export async function handleLinkedInCallback(code: string, state: string): Promise<LinkedInTokens> {
+export async function handleLinkedInCallback(
+  code: string,
+  state: string
+): Promise<LinkedInTokens> {
   // Verify state to prevent CSRF
   const savedState = sessionStorage.getItem('linkedin_oauth_state');
   if (state !== savedState) {
@@ -119,6 +118,7 @@ export async function handleLinkedInCallback(code: string, state: string): Promi
     body: JSON.stringify({
       code,
       redirect_uri: LINKEDIN_REDIRECT_URI,
+      client_id: LINKEDIN_CLIENT_ID,
     }),
   });
 
@@ -131,33 +131,77 @@ export async function handleLinkedInCallback(code: string, state: string): Promi
 }
 
 /**
- * Fetch user profile from LinkedIn
+ * Fetch user profile from LinkedIn via Lambda function
+ * (Bypasses CORS by routing through server-side)
  */
 export async function fetchLinkedInProfile(accessToken: string): Promise<LinkedInProfile> {
-  const response = await fetch('https://api.linkedin.com/v2/userinfo', {
+  const response = await fetch(LINKEDIN_AUTH_FUNCTION_URL, {
+    method: 'POST',
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
     },
+    body: JSON.stringify({
+      action: 'profile',
+      access_token: accessToken,
+    }),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch LinkedIn profile');
+    const error = await response.json().catch(() => ({ error: 'Failed to fetch profile' }));
+    throw new Error(error.error || 'Failed to fetch LinkedIn profile');
   }
 
-  const data = await response.json();
-  
-  return {
-    id: data.sub,
-    firstName: data.given_name,
-    lastName: data.family_name,
-    email: data.email,
-    profilePicture: data.picture,
-  };
+  return response.json();
+}
+
+/**
+ * Fetch post analytics for the authenticated member
+ */
+export async function fetchMemberPostAnalytics(
+  accessToken: string,
+  startDate?: Date,
+  endDate?: Date
+): Promise<unknown> {
+  const params = new URLSearchParams({
+    q: 'me',
+    queryType: 'IMPRESSION',
+    aggregation: 'DAILY',
+  });
+
+  if (startDate) {
+    params.set('startDate.day', String(startDate.getDate()));
+    params.set('startDate.month', String(startDate.getMonth() + 1));
+    params.set('startDate.year', String(startDate.getFullYear()));
+  }
+
+  if (endDate) {
+    params.set('endDate.day', String(endDate.getDate()));
+    params.set('endDate.month', String(endDate.getMonth() + 1));
+    params.set('endDate.year', String(endDate.getFullYear()));
+  }
+
+  const response = await fetch(
+    `https://api.linkedin.com/rest/memberCreatorPostAnalytics?${params.toString()}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'LinkedIn-Version': '202401',
+        'X-Restli-Protocol-Version': '2.0.0',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('LinkedIn API error:', errorText);
+    throw new Error('Failed to fetch post analytics');
+  }
+
+  return response.json();
 }
 
 /**
  * Store LinkedIn tokens securely
- * In production, consider using Monday's secure storage or a backend
  */
 export function storeLinkedInTokens(tokens: LinkedInTokens): void {
   const expiresAt = Date.now() + (tokens.expires_in * 1000);
@@ -165,8 +209,6 @@ export function storeLinkedInTokens(tokens: LinkedInTokens): void {
     ...tokens,
     expiresAt,
   };
-  
-  // Store in localStorage for now - in production use secure backend storage
   localStorage.setItem('linkedin_tokens', JSON.stringify(tokenData));
 }
 
@@ -203,4 +245,3 @@ export function clearLinkedInTokens(): void {
 export function isLinkedInConnected(): boolean {
   return getLinkedInTokens() !== null;
 }
-

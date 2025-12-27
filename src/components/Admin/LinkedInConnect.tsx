@@ -1,45 +1,51 @@
 import { useState, useEffect } from 'react'
 import { 
-  initiateLinkedInAuth, 
+  initiateLinkedInAuth,
   getLinkedInTokens,
   clearLinkedInTokens,
   fetchLinkedInProfile,
+  isLinkedInConnected,
+  type LinkedInProfile,
 } from '@/services/linkedin-api'
 import './linkedin-connect.css'
 
 const LINKEDIN_CLIENT_ID = import.meta.env.VITE_LINKEDIN_CLIENT_ID || ''
 
-interface ConnectedAccount {
-  name: string
-  email: string
-  connectedAt: string
-  lastSync?: string
+interface ConnectionStatus {
+  connected: boolean;
+  profile?: LinkedInProfile;
+  connectedAt?: string;
 }
 
 export default function LinkedInConnect() {
-  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([])
+  const [status, setStatus] = useState<ConnectionStatus>({ connected: false })
   const [isConnecting, setIsConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Check if user is already connected
-    loadConnectedAccounts()
+    loadConnectionStatus()
   }, [])
 
-  const loadConnectedAccounts = async () => {
+  const loadConnectionStatus = async () => {
+    if (!isLinkedInConnected()) {
+      setStatus({ connected: false })
+      return
+    }
+
     const tokens = getLinkedInTokens()
-    if (tokens) {
-      try {
-        const profile = await fetchLinkedInProfile(tokens.access_token)
-        setConnectedAccounts([{
-          name: `${profile.firstName} ${profile.lastName}`,
-          email: profile.email || 'No email',
-          connectedAt: new Date().toLocaleDateString(),
-        }])
-      } catch (err) {
-        console.error('Failed to load profile:', err)
-        clearLinkedInTokens()
-      }
+    if (!tokens) return
+
+    try {
+      const profile = await fetchLinkedInProfile(tokens.access_token)
+      setStatus({
+        connected: true,
+        profile,
+        connectedAt: new Date(tokens.expiresAt - (tokens.expires_in * 1000)).toLocaleDateString(),
+      })
+    } catch (err) {
+      console.error('Failed to load profile:', err)
+      clearLinkedInTokens()
+      setStatus({ connected: false })
     }
   }
 
@@ -54,23 +60,23 @@ export default function LinkedInConnect() {
     
     try {
       const tokens = await initiateLinkedInAuth()
-      // Auth succeeded - load the profile
       const profile = await fetchLinkedInProfile(tokens.access_token)
-      setConnectedAccounts([{
-        name: `${profile.firstName} ${profile.lastName}`,
-        email: profile.email || 'No email',
+      
+      setStatus({
+        connected: true,
+        profile,
         connectedAt: new Date().toLocaleDateString(),
-      }])
+      })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate LinkedIn auth')
+      setError(err instanceof Error ? err.message : 'Failed to connect LinkedIn')
     } finally {
       setIsConnecting(false)
     }
   }
 
-  const handleDisconnect = (email: string) => {
+  const handleDisconnect = () => {
     clearLinkedInTokens()
-    setConnectedAccounts(connectedAccounts.filter(a => a.email !== email))
+    setStatus({ connected: false })
   }
 
   return (
@@ -83,7 +89,7 @@ export default function LinkedInConnect() {
         </div>
         <div>
           <h3>LinkedIn Integration</h3>
-          <p>Connect employee LinkedIn accounts to sync analytics data</p>
+          <p>Connect your LinkedIn account to sync analytics data</p>
         </div>
       </div>
 
@@ -104,7 +110,7 @@ export default function LinkedInConnect() {
       )}
 
       {error && (
-        <div className="config-warning">
+        <div className="config-warning" style={{ borderColor: '#ef4444' }}>
           <span>❌</span>
           <div>
             <strong>Error</strong>
@@ -113,69 +119,74 @@ export default function LinkedInConnect() {
         </div>
       )}
 
-      <div className="connected-accounts">
-        <div className="accounts-header">
-          <h4>Connected Accounts</h4>
-          <span className="account-count">{connectedAccounts.length} connected</span>
+      {/* Connection Status */}
+      <div className="connection-section">
+        <div className="section-header">
+          <h4>📊 LinkedIn Analytics</h4>
+          <p className="section-description">Access your profile info and post analytics</p>
         </div>
 
-        {connectedAccounts.length === 0 ? (
-          <div className="no-accounts">
-            <p>No LinkedIn accounts connected yet</p>
-            <p className="hint">Connect an account to start syncing analytics</p>
+        {status.connected && status.profile ? (
+          <div className="connected-card">
+            <div className="connected-info">
+              <div className="status-badge success">✓ Connected</div>
+              <div className="profile-info">
+                <strong>{status.profile.firstName} {status.profile.lastName}</strong>
+                {status.profile.headline && (
+                  <span>{status.profile.headline}</span>
+                )}
+                {status.connectedAt && (
+                  <span className="connected-date">Connected on {status.connectedAt}</span>
+                )}
+              </div>
+            </div>
+            <button 
+              onClick={handleDisconnect}
+              className="disconnect-btn"
+            >
+              Disconnect
+            </button>
           </div>
         ) : (
-          <div className="accounts-list">
-            {connectedAccounts.map((account) => (
-              <div key={account.email} className="account-item">
-                <div className="account-info">
-                  <strong>{account.name}</strong>
-                  <span>{account.email}</span>
-                  {account.lastSync && (
-                    <span className="last-sync">Last sync: {account.lastSync}</span>
-                  )}
-                </div>
-                <button 
-                  onClick={() => handleDisconnect(account.email)}
-                  className="disconnect-btn"
-                >
-                  Disconnect
-                </button>
-              </div>
-            ))}
-          </div>
+          <button 
+            onClick={handleConnect}
+            disabled={isConnecting || !LINKEDIN_CLIENT_ID}
+            className="connect-button"
+          >
+            {isConnecting ? (
+              <>
+                <div className="button-spinner" />
+                Connecting...
+              </>
+            ) : (
+              <>
+                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                </svg>
+                Connect LinkedIn Account
+              </>
+            )}
+          </button>
         )}
+
+        <div className="scope-info">
+          <small>Access: Profile info + Post analytics</small>
+        </div>
       </div>
 
-      <button 
-        onClick={handleConnect}
-        disabled={isConnecting || !LINKEDIN_CLIENT_ID}
-        className="connect-button"
-      >
-        {isConnecting ? (
-          <>
-            <div className="button-spinner" />
-            Connecting...
-          </>
-        ) : (
-          <>
-            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-            </svg>
-            Connect LinkedIn Account
-          </>
-        )}
-      </button>
-
       <div className="api-notice">
-        <h4>📝 Note on LinkedIn API Access</h4>
+        <h4>ℹ️ What This Does</h4>
         <p>
-          LinkedIn restricts API access for analytics data. To get post impressions and engagement metrics, 
-          you may need to apply for the <strong>Marketing Developer Platform</strong> or use the 
-          <strong> Manual Upload</strong> feature with exported data.
+          Connecting your LinkedIn account allows this app to:
+        </p>
+        <ul>
+          <li><strong>View your profile:</strong> Name, photo, headline</li>
+          <li><strong>Access post analytics:</strong> Impressions, engagement, reach</li>
+        </ul>
+        <p>
+          Your credentials are securely stored and you can disconnect at any time.
         </p>
       </div>
     </div>
   )
 }
-

@@ -1,10 +1,19 @@
 import type { Handler } from "aws-lambda";
-import type { IncomingMessage } from "http";
 import * as https from "https";
 import * as querystring from "querystring";
+import type { IncomingMessage } from "http";
 
+// LinkedIn Community Management App credentials
 const LINKEDIN_CLIENT_ID = process.env.LINKEDIN_CLIENT_ID!;
 const LINKEDIN_CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET!;
+
+interface TokenRequest {
+  action?: "token" | "profile";
+  code?: string;
+  redirect_uri?: string;
+  client_id?: string;
+  access_token?: string;
+}
 
 interface TokenResponse {
   access_token: string;
@@ -13,70 +22,111 @@ interface TokenResponse {
   scope?: string;
 }
 
-interface OAuthRequest {
-  code: string;
-  redirect_uri: string;
+interface ProfileResponse {
+  id: string;
+  firstName: string;
+  lastName: string;
+  headline?: string;
+  profilePicture?: string;
 }
 
 export const handler: Handler = async (event) => {
   // CORS headers
   const headers = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
     "Content-Type": "application/json",
   };
 
-  // Handle preflight
-  if (event.httpMethod === "OPTIONS" || event.requestContext?.http?.method === "OPTIONS") {
-    return { statusCode: 200, headers, body: "" };
+  // Handle OPTIONS preflight
+  if (event.requestContext?.http?.method === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers,
+      body: "",
+    };
   }
 
   try {
-    const body: OAuthRequest = JSON.parse(event.body || "{}");
-    const { code, redirect_uri } = body;
+    // Parse request body
+    const body: TokenRequest = JSON.parse(event.body || "{}");
+    const action = body.action || "token";
 
-    if (!code) {
+    // Handle profile fetch action
+    if (action === "profile") {
+      const { access_token } = body;
+
+      if (!access_token) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: "Missing required parameter: access_token" }),
+        };
+      }
+
+      const profile = await fetchLinkedInProfile(access_token);
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify(profile),
+      };
+    }
+
+    // Handle token exchange action (default)
+    const { code, redirect_uri, client_id } = body;
+
+    if (!code || !redirect_uri || !client_id) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: "Authorization code is required" }),
+        body: JSON.stringify({
+          error: "Missing required parameters: code, redirect_uri, client_id",
+        }),
       };
     }
 
-    if (!LINKEDIN_CLIENT_ID || !LINKEDIN_CLIENT_SECRET) {
+    // Validate client ID
+    if (client_id !== LINKEDIN_CLIENT_ID) {
       return {
-        statusCode: 500,
+        statusCode: 400,
         headers,
-        body: JSON.stringify({ error: "LinkedIn credentials not configured" }),
+        body: JSON.stringify({ error: "Invalid client_id" }),
       };
     }
 
-    // Exchange code for access token
-    const tokenData = await exchangeCodeForToken(code, redirect_uri);
+    // Exchange code for token
+    const tokens = await exchangeCodeForToken(code, redirect_uri);
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(tokenData),
+      body: JSON.stringify(tokens),
     };
   } catch (error) {
-    console.error("OAuth error:", error);
+    console.error("LinkedIn API error:", error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ 
-        error: error instanceof Error ? error.message : "Token exchange failed" 
+      body: JSON.stringify({
+        error: error instanceof Error ? error.message : "Request failed",
       }),
     };
   }
 };
 
-function exchangeCodeForToken(code: string, redirectUri: string): Promise<TokenResponse> {
+/**
+ * Exchange authorization code for access token
+ */
+function exchangeCodeForToken(
+  code: string,
+  redirectUri: string
+): Promise<TokenResponse> {
   return new Promise((resolve, reject) => {
     const postData = querystring.stringify({
       grant_type: "authorization_code",
-      code: code,
+      code,
       redirect_uri: redirectUri,
       client_id: LINKEDIN_CLIENT_ID,
       client_secret: LINKEDIN_CLIENT_SECRET,
@@ -95,29 +145,105 @@ function exchangeCodeForToken(code: string, redirectUri: string): Promise<TokenR
 
     const req = https.request(options, (res: IncomingMessage) => {
       let data = "";
-      res.on("data", (chunk: string | Buffer) => (data += chunk));
+
+      res.on("data", (chunk: Buffer) => {
+        data += chunk;
+      });
+
       res.on("end", () => {
         try {
-          const parsed = JSON.parse(data);
-          if (parsed.error) {
-            reject(new Error(parsed.error_description || parsed.error));
+          const response = JSON.parse(data);
+
+          if (res.statusCode === 200) {
+            resolve(response as TokenResponse);
           } else {
-            resolve({
-              access_token: parsed.access_token,
-              expires_in: parsed.expires_in,
-              refresh_token: parsed.refresh_token,
-              scope: parsed.scope,
-            });
+            reject(
+              new Error(
+                response.error_description || response.error || "Token exchange failed"
+              )
+            );
           }
-        } catch {
+        } catch (err) {
           reject(new Error("Failed to parse LinkedIn response"));
         }
       });
     });
 
-    req.on("error", reject);
+    req.on("error", (err) => {
+      reject(new Error(`Request failed: ${err.message}`));
+    });
+
     req.write(postData);
     req.end();
   });
 }
 
+/**
+ * Fetch LinkedIn profile using access token
+ */
+function fetchLinkedInProfile(accessToken: string): Promise<ProfileResponse> {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: "api.linkedin.com",
+      port: 443,
+      path: "/v2/me",
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    };
+
+    const req = https.request(options, (res: IncomingMessage) => {
+      let data = "";
+
+      res.on("data", (chunk: Buffer) => {
+        data += chunk;
+      });
+
+      res.on("end", () => {
+        try {
+          const response = JSON.parse(data);
+
+          if (res.statusCode === 200) {
+            // Extract localized names from LinkedIn response
+            const firstName =
+              response.localizedFirstName ||
+              response.firstName?.localized?.en_US ||
+              "User";
+            const lastName =
+              response.localizedLastName ||
+              response.lastName?.localized?.en_US ||
+              "";
+
+            // Extract profile picture if available
+            const profilePicture =
+              response.profilePicture?.["displayImage~"]?.elements?.[0]
+                ?.identifiers?.[0]?.identifier;
+
+            resolve({
+              id: response.id,
+              firstName,
+              lastName,
+              headline: response.localizedHeadline,
+              profilePicture,
+            });
+          } else {
+            reject(
+              new Error(
+                response.message || response.error || "Failed to fetch profile"
+              )
+            );
+          }
+        } catch (err) {
+          reject(new Error("Failed to parse LinkedIn profile response"));
+        }
+      });
+    });
+
+    req.on("error", (err) => {
+      reject(new Error(`Profile request failed: ${err.message}`));
+    });
+
+    req.end();
+  });
+}
