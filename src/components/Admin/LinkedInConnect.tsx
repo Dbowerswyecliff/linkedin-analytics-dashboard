@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { 
+  initiateLinkedInAuth, 
+  getLinkedInTokens,
+  clearLinkedInTokens,
+  fetchLinkedInProfile,
+} from '@/services/linkedin-api'
 import './linkedin-connect.css'
 
-// LinkedIn OAuth configuration
 const LINKEDIN_CLIENT_ID = import.meta.env.VITE_LINKEDIN_CLIENT_ID || ''
-const LINKEDIN_REDIRECT_URI = import.meta.env.VITE_LINKEDIN_REDIRECT_URI || window.location.origin + '/auth/linkedin/callback'
-const LINKEDIN_SCOPES = ['openid', 'profile', 'email'].join(' ')
 
 interface ConnectedAccount {
   name: string
@@ -14,33 +17,52 @@ interface ConnectedAccount {
 }
 
 export default function LinkedInConnect() {
-  const [connectedAccounts] = useState<ConnectedAccount[]>([])
+  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([])
   const [isConnecting, setIsConnecting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Check if user is already connected
+    loadConnectedAccounts()
+  }, [])
+
+  const loadConnectedAccounts = async () => {
+    const tokens = getLinkedInTokens()
+    if (tokens) {
+      try {
+        const profile = await fetchLinkedInProfile(tokens.access_token)
+        setConnectedAccounts([{
+          name: `${profile.firstName} ${profile.lastName}`,
+          email: profile.email || 'No email',
+          connectedAt: new Date().toLocaleDateString(),
+        }])
+      } catch (err) {
+        console.error('Failed to load profile:', err)
+        clearLinkedInTokens()
+      }
+    }
+  }
 
   const handleConnect = () => {
     if (!LINKEDIN_CLIENT_ID) {
-      alert('LinkedIn Client ID is not configured. Please set VITE_LINKEDIN_CLIENT_ID in your environment.')
+      setError('LinkedIn Client ID is not configured. Please set VITE_LINKEDIN_CLIENT_ID in your environment.')
       return
     }
 
     setIsConnecting(true)
+    setError(null)
     
-    const state = crypto.randomUUID()
-    sessionStorage.setItem('linkedin_oauth_state', state)
-
-    const authUrl = new URL('https://www.linkedin.com/oauth/v2/authorization')
-    authUrl.searchParams.set('response_type', 'code')
-    authUrl.searchParams.set('client_id', LINKEDIN_CLIENT_ID)
-    authUrl.searchParams.set('redirect_uri', LINKEDIN_REDIRECT_URI)
-    authUrl.searchParams.set('state', state)
-    authUrl.searchParams.set('scope', LINKEDIN_SCOPES)
-
-    window.location.href = authUrl.toString()
+    try {
+      initiateLinkedInAuth()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to initiate LinkedIn auth')
+      setIsConnecting(false)
+    }
   }
 
   const handleDisconnect = (email: string) => {
-    // In a real app, this would call an API to revoke the token
-    console.log('Disconnecting:', email)
+    clearLinkedInTokens()
+    setConnectedAccounts(connectedAccounts.filter(a => a.email !== email))
   }
 
   return (
@@ -69,6 +91,16 @@ export default function LinkedInConnect() {
                 LinkedIn Developer Portal
               </a>
             </p>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="config-warning">
+          <span>❌</span>
+          <div>
+            <strong>Error</strong>
+            <p>{error}</p>
           </div>
         </div>
       )}
