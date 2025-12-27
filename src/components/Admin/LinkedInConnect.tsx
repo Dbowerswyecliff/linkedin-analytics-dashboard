@@ -43,9 +43,18 @@ export default function LinkedInConnect() {
         connectedAt: new Date(tokens.expiresAt - (tokens.expires_in * 1000)).toLocaleDateString(),
       })
     } catch (err) {
-      console.error('Failed to load profile:', err)
-      clearLinkedInTokens()
-      setStatus({ connected: false })
+      console.warn('[Admin] Failed to load profile (Lambda not deployed?), showing connection without profile:', err)
+      
+      // Still show as connected even if profile fetch fails
+      setStatus({
+        connected: true,
+        profile: {
+          id: 'unknown',
+          firstName: 'LinkedIn',
+          lastName: 'User',
+        },
+        connectedAt: new Date(tokens.expiresAt - (tokens.expires_in * 1000)).toLocaleDateString(),
+      })
     }
   }
 
@@ -60,14 +69,33 @@ export default function LinkedInConnect() {
     
     try {
       const tokens = await initiateLinkedInAuth()
-      const profile = await fetchLinkedInProfile(tokens.access_token)
+      console.log('[Admin] Got tokens, attempting to fetch profile...')
       
-      setStatus({
-        connected: true,
-        profile,
-        connectedAt: new Date().toLocaleDateString(),
-      })
+      try {
+        const profile = await fetchLinkedInProfile(tokens.access_token)
+        console.log('[Admin] Profile fetched successfully:', profile)
+        
+        setStatus({
+          connected: true,
+          profile,
+          connectedAt: new Date().toLocaleDateString(),
+        })
+      } catch (profileErr) {
+        console.warn('[Admin] Profile fetch failed (Lambda not deployed?), showing connection without profile:', profileErr)
+        
+        // Still show as connected even if profile fetch fails
+        setStatus({
+          connected: true,
+          profile: {
+            id: 'unknown',
+            firstName: 'LinkedIn',
+            lastName: 'User',
+          },
+          connectedAt: new Date().toLocaleDateString(),
+        })
+      }
     } catch (err) {
+      console.error('[Admin] OAuth failed:', err)
       setError(err instanceof Error ? err.message : 'Failed to connect LinkedIn')
     } finally {
       setIsConnecting(false)

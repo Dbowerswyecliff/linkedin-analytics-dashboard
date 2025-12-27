@@ -40,8 +40,29 @@ export function initiateLinkedInAuth(): Promise<LinkedInTokens> {
       return;
     }
 
+    // Check if an OAuth flow is already in progress
+    const existingState = localStorage.getItem('linkedin_oauth_state');
+    const existingTimestamp = localStorage.getItem('linkedin_oauth_state_timestamp');
+    if (existingState && existingTimestamp) {
+      const age = Date.now() - parseInt(existingTimestamp);
+      if (age < 60000) { // Less than 1 minute old
+        console.warn('[OAuth] OAuth flow already in progress, please wait...');
+        reject(new Error('OAuth flow already in progress. Please wait and try again.'));
+        return;
+      }
+    }
+
+    // Generate new state token
     const state = crypto.randomUUID();
-    sessionStorage.setItem('linkedin_oauth_state', state);
+    
+    // Store state in localStorage so popup can access it
+    localStorage.setItem('linkedin_oauth_state', state);
+    localStorage.setItem('linkedin_oauth_state_timestamp', Date.now().toString());
+    
+    console.log('[OAuth] State set:', {
+      state: state.substring(0, 8) + '...',
+      timestamp: Date.now(),
+    });
 
     const authUrl = new URL('https://www.linkedin.com/oauth/v2/authorization');
     authUrl.searchParams.set('response_type', 'code');
@@ -70,12 +91,20 @@ export function initiateLinkedInAuth(): Promise<LinkedInTokens> {
 
     // Listen for message from popup
     const handleMessage = (event: MessageEvent) => {
+      // Only accept messages from same origin
+      if (event.origin !== window.location.origin) {
+        console.warn('[OAuth] Ignored message from foreign origin:', event.origin);
+        return;
+      }
+      
       if (event.data?.type === 'linkedin-auth-success') {
+        console.log('[OAuth] Received success message from popup');
         window.removeEventListener('message', handleMessage);
         clearInterval(popupCheckInterval);
         storeLinkedInTokens(event.data.tokens);
         resolve(event.data.tokens);
       } else if (event.data?.type === 'linkedin-auth-error') {
+        console.log('[OAuth] Received error message from popup:', event.data.error);
         window.removeEventListener('message', handleMessage);
         clearInterval(popupCheckInterval);
         reject(new Error(event.data.error || 'LinkedIn authentication failed'));
@@ -103,11 +132,50 @@ export async function handleLinkedInCallback(
   state: string
 ): Promise<LinkedInTokens> {
   // Verify state to prevent CSRF
-  const savedState = sessionStorage.getItem('linkedin_oauth_state');
-  if (state !== savedState) {
-    throw new Error('Invalid OAuth state - possible CSRF attack');
+  const savedState = localStorage.getItem('linkedin_oauth_state');
+  const stateTimestamp = localStorage.getItem('linkedin_oauth_state_timestamp');
+  
+  // Debug logging
+  console.log('[OAuth Debug]', {
+    receivedState: state.substring(0, 12) + '...',
+    savedState: savedState ? savedState.substring(0, 12) + '...' : 'null',
+    match: state === savedState,
+    timestamp: stateTimestamp,
+    age: stateTimestamp ? `${Math.round((Date.now() - parseInt(stateTimestamp)) / 1000)}s` : 'unknown',
+    allLocalStorageKeys: Object.keys(localStorage),
+  });
+  
+  // If no saved state, this might be a duplicate attempt or the state was cleared
+  if (!savedState) {
+    console.error('[OAuth Error] No saved state found. Possible causes:', {
+      cause1: 'State already consumed by previous attempt',
+      cause2: 'localStorage was cleared',
+      cause3: 'Different browser context',
+    });
+    throw new Error('OAuth state not found. Please close any other LinkedIn connection popups and try again.');
   }
-  sessionStorage.removeItem('linkedin_oauth_state');
+  
+  // Check if state is expired (older than 10 minutes)
+  if (stateTimestamp) {
+    const age = Date.now() - parseInt(stateTimestamp);
+    if (age > 10 * 60 * 1000) {
+      localStorage.removeItem('linkedin_oauth_state');
+      localStorage.removeItem('linkedin_oauth_state_timestamp');
+      throw new Error('OAuth state expired. Please try connecting again.');
+    }
+  }
+  
+  if (state !== savedState) {
+    const errorMsg = `State mismatch - Received: ${state?.substring(0, 8)}..., Expected: ${savedState?.substring(0, 8)}`;
+    console.error('[OAuth Error]', errorMsg);
+    throw new Error('OAuth state mismatch. Please try connecting again.');
+  }
+  
+  console.log('[OAuth] State validated successfully');
+  
+  // Clear the state after successful validation
+  localStorage.removeItem('linkedin_oauth_state');
+  localStorage.removeItem('linkedin_oauth_state_timestamp');
 
   // Exchange code for token via serverless function
   const response = await fetch(LINKEDIN_AUTH_FUNCTION_URL, {
@@ -244,4 +312,15 @@ export function clearLinkedInTokens(): void {
  */
 export function isLinkedInConnected(): boolean {
   return getLinkedInTokens() !== null;
+}
+
+/**
+ * Debug helper: Clear all OAuth state
+ * Use this when troubleshooting OAuth issues
+ */
+export function clearAllLinkedInData(): void {
+  localStorage.removeItem('linkedin_tokens');
+  localStorage.removeItem('linkedin_oauth_state');
+  localStorage.removeItem('linkedin_oauth_state_timestamp');
+  console.log('[LinkedIn] All data cleared');
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { handleLinkedInCallback } from '@/services/linkedin-api'
 
@@ -11,13 +11,34 @@ export default function LinkedInCallback() {
   const [searchParams] = useSearchParams()
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
   const [errorMessage, setErrorMessage] = useState<string>('')
+  const hasRun = useRef(false)
 
   useEffect(() => {
+    // Prevent multiple executions (React strict mode, hot reload, etc.)
+    if (hasRun.current) {
+      console.log('[OAuth Callback] Already executed, skipping duplicate call');
+      return;
+    }
+    hasRun.current = true;
+    
     const handleCallback = async () => {
+      console.log('[OAuth Callback] Starting callback handler', {
+        url: window.location.href,
+        hasOpener: !!window.opener,
+      });
+      
       const code = searchParams.get('code')
       const state = searchParams.get('state')
       const error = searchParams.get('error')
       const errorDescription = searchParams.get('error_description')
+      
+      console.log('[OAuth Callback] Params:', { 
+        code: code?.substring(0, 10) + '...', 
+        state: state?.substring(0, 10) + '...', 
+        error,
+        localStorageState: localStorage.getItem('linkedin_oauth_state')?.substring(0, 10) + '...',
+        localStorageKeys: Object.keys(localStorage),
+      })
 
       // Handle LinkedIn error response
       if (error) {
