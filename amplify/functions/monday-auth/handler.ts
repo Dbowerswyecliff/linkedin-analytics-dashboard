@@ -38,12 +38,8 @@ interface MondayTokenResponse {
 interface MondayUser {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   photo_thumb_small?: string;
-  account: {
-    id: string;
-    name: string;
-  };
 }
 
 interface MondaySession {
@@ -146,18 +142,13 @@ async function exchangeCodeForToken(
 async function getMondayUser(accessToken: string): Promise<MondayUser> {
   console.log("[Monday OAuth] Fetching user info...");
 
+  // Use minimal query - some fields require additional OAuth scopes
   const query = JSON.stringify({
     query: `
       query {
         me {
           id
           name
-          email
-          photo_thumb_small
-          account {
-            id
-            name
-          }
         }
       }
     `,
@@ -389,14 +380,14 @@ export const handler: Handler = async (event) => {
         // Get user info
         const user = await getMondayUser(tokenData.access_token);
 
-        // Create session
+        // Create session (account info not available with basic OAuth)
         const session = await createSession(
           user.id,
-          user.account.id,
+          "default",           // accountId - not available with basic OAuth
           user.name,
-          user.email,
+          user.email || "",    // email might not be available
           user.photo_thumb_small,
-          user.account.name,
+          "Monday Account",    // accountName - not available with basic OAuth
           tokenData.access_token
         );
 
@@ -409,11 +400,11 @@ export const handler: Handler = async (event) => {
             user: {
               id: user.id,
               name: user.name,
-              email: user.email,
+              email: user.email || "",
               photo: user.photo_thumb_small,
               account: {
-                id: user.account.id,
-                name: user.account.name,
+                id: "default",
+                name: "Monday Account",
               },
             },
             expiresAt: session.expiresAt,
