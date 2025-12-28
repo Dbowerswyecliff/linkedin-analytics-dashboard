@@ -50,7 +50,7 @@ function AppRoutes({ needsSetup }: { needsSetup: boolean }) {
   // #endregion
   
   // OAuth callback route - render without app shell
-  if (location.pathname === '/auth/linkedin/callback') {
+  if (location.pathname === '/auth/linkedin/callback' || location.pathname === '/auth/linkedin/callback/') {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'src/App.tsx:AppRoutes',message:'route_branch_callback_exact',data:{pathname:location.pathname},timestamp:Date.now()})}).catch(()=>{});
     // #endregion

@@ -108,13 +108,11 @@ export default function LinkedInCallback() {
           // Close popup after a short delay
           setTimeout(() => window.close(), 1500)
         } else {
-          // No opener (opened as tab, not popup) - redirect to admin page
+          // No opener (opened as tab, not popup) - stay on success screen.
           // #region agent log
           fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'src/components/Auth/LinkedInCallback.tsx:handleCallback',message:'success_no_opener_redirecting',data:{pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
           // #endregion
-          setTimeout(() => {
-            window.location.href = '/admin'
-          }, 1500)
+          // Do not redirect into the main app; user should return to Monday.
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to complete authentication'
@@ -193,6 +191,36 @@ export default function LinkedInCallback() {
           <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>
             {window.opener ? 'This window will close automatically...' : 'Redirecting to app...'}
           </p>
+          {!window.opener && (
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={() => window.close()}
+                style={{
+                  padding: '0.6rem 0.9rem',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  background: 'rgba(255,255,255,0.06)',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                }}
+              >
+                Close this tab
+              </button>
+              <button
+                onClick={() => window.location.href = '/'}
+                style={{
+                  padding: '0.6rem 0.9rem',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#0077b5',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                }}
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          )}
         </>
       )}
 
