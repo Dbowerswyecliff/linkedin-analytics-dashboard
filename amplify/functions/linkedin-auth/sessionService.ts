@@ -115,17 +115,26 @@ export async function deleteSession(sessionId: string): Promise<void> {
  * Delete all sessions for a user (when disconnecting LinkedIn)
  */
 export async function deleteAllUserSessions(mondayUserId: string): Promise<void> {
-  // Query sessions by user ID using the GSI
-  const result = await dynamodb.send(new QueryCommand({
-    TableName: SESSIONS_TABLE,
-    IndexName: 'mondayUserId',
-    KeyConditionExpression: 'mondayUserId = :userId',
-    ExpressionAttributeValues: {
-      ':userId': { S: mondayUserId },
-    },
-  }));
+  // Query sessions by user ID using the GSI.
+  // Some environments may not have this GSI yet (or may have drifted), so fail soft.
+  let result: { Items?: Array<Record<string, AttributeValue>> } | undefined;
+  try {
+    result = await dynamodb.send(new QueryCommand({
+      TableName: SESSIONS_TABLE,
+      IndexName: 'mondayUserId',
+      KeyConditionExpression: 'mondayUserId = :userId',
+      ExpressionAttributeValues: {
+        ':userId': { S: mondayUserId },
+      },
+    }));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Typical error: "The table does not have the specified index: mondayUserId"
+    console.warn(`[SessionService] Failed to query sessions by mondayUserId (skipping): ${msg}`);
+    return;
+  }
 
-  if (result.Items && result.Items.length > 0) {
+  if (result?.Items && result.Items.length > 0) {
     // Delete each session
     for (const item of result.Items) {
       const sessionId = item.sessionId?.S;
