@@ -42,7 +42,7 @@ const LINKEDIN_CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET!;
  * Request body types for different actions
  */
 interface RequestBody {
-  action?: "token" | "profile" | "status" | "disconnect" | "analytics" | "refresh" | "query" | "syncStatus" | "allEmployees";
+  action?: "token" | "profile" | "status" | "disconnect" | "analytics" | "refresh" | "query" | "syncStatus" | "allEmployees" | "adminDelete";
   code?: string;
   redirect_uri?: string;
   client_id?: string;
@@ -121,6 +121,9 @@ export const handler: Handler = async (event) => {
 
       case "allEmployees":
         return await handleAllEmployees(body, headers);
+
+      case "adminDelete":
+        return await handleAdminDelete(body, headers);
 
       default:
         return {
@@ -931,6 +934,50 @@ async function handleAllEmployees(
       headers,
       body: JSON.stringify({
         error: error instanceof Error ? error.message : "Failed to get employees",
+      }),
+    };
+  }
+}
+
+/**
+ * Handle admin delete: remove a user's tokens by mondayUserId (for cleanup)
+ */
+async function handleAdminDelete(
+  body: RequestBody,
+  headers: Record<string, string>
+) {
+  const { mondayUserId } = body;
+
+  if (!mondayUserId) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: "Missing required parameter: mondayUserId" }),
+    };
+  }
+
+  try {
+    // Delete tokens
+    await deleteTokens(mondayUserId);
+
+    // Delete all sessions for this user
+    await deleteAllUserSessions(mondayUserId);
+
+    console.log(`[Handler] Admin deleted user ${mondayUserId}`);
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ success: true, deleted: mondayUserId }),
+    };
+
+  } catch (error) {
+    console.error("[Handler] Admin delete error:", error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        error: error instanceof Error ? error.message : "Failed to delete user",
       }),
     };
   }
