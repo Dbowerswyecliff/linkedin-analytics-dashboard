@@ -111,12 +111,14 @@ export default function LinkedInCallback() {
       try {
         // Exchange code for session (tokens stored server-side)
         const session = await handleLinkedInCallback(code, state)
-          // No opener (opened as tab, not popup) - stay on success screen.
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'src/components/Auth/LinkedInCallback.tsx:handleCallback',message:'success_no_opener_redirecting',data:{pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
-          // Do not redirect into the main app; user should return to Monday.
-        }
+        
+        // Store session ID locally
+        storeSession(session.sessionId)
+        
+        setStatus('success')
+        
+        console.log('[OAuth Callback] Direct access success, session stored');
+        // No opener (opened as tab, not popup) - stay on success screen.
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to complete authentication'
         setErrorMessage(message)
