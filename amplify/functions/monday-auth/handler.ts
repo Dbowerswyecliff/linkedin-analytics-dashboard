@@ -3,15 +3,15 @@
  * Handles OAuth token exchange and session management for Monday authentication
  */
 
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import type { Handler } from "aws-lambda";
 import {
-  DynamoDBDocumentClient,
-  PutCommand,
-  GetCommand,
-  DeleteCommand,
+  DynamoDBClient,
+  PutItemCommand,
+  GetItemCommand,
+  DeleteItemCommand,
   QueryCommand,
-} from "@aws-sdk/lib-dynamodb";
-import crypto from "crypto";
+} from "@aws-sdk/client-dynamodb";
+import * as https from "https";
 
 // Environment variables
 const MONDAY_CLIENT_ID = process.env.MONDAY_CLIENT_ID || "";
@@ -19,8 +19,7 @@ const MONDAY_CLIENT_SECRET = process.env.MONDAY_CLIENT_SECRET || "";
 const MONDAY_SESSIONS_TABLE = process.env.MONDAY_SESSIONS_TABLE || "";
 
 // DynamoDB client
-const dynamoClient = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
+const dynamodb = new DynamoDBClient({});
 
 // CORS headers
 const corsHeaders = {
@@ -36,18 +35,14 @@ interface MondayTokenResponse {
   scope: string;
 }
 
-interface MondayUserResponse {
-  data: {
-    me: {
-      id: string;
-      name: string;
-      email: string;
-      photo_thumb_small?: string;
-      account: {
-        id: string;
-        name: string;
-      };
-    };
+interface MondayUser {
+  id: string;
+  name: string;
+  email: string;
+  photo_thumb_small?: string;
+  account: {
+    id: string;
+    name: string;
   };
 }
 
@@ -65,6 +60,49 @@ interface MondaySession {
 }
 
 /**
+ * Generate UUID
+ */
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/**
+ * Make HTTPS request
+ */
+function httpsRequest(
+  url: string,
+  options: https.RequestOptions,
+  data?: string
+): Promise<{ statusCode: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const req = https.request(
+      {
+        hostname: urlObj.hostname,
+        port: 443,
+        path: urlObj.pathname + urlObj.search,
+        method: options.method || "GET",
+        headers: options.headers,
+      },
+      (res) => {
+        let body = "";
+        res.on("data", (chunk) => (body += chunk));
+        res.on("end", () => {
+          resolve({ statusCode: res.statusCode || 500, body });
+        });
+      }
+    );
+    req.on("error", reject);
+    if (data) req.write(data);
+    req.end();
+  });
+}
+
+/**
  * Exchange authorization code for access token
  */
 async function exchangeCodeForToken(
@@ -73,26 +111,31 @@ async function exchangeCodeForToken(
 ): Promise<MondayTokenResponse> {
   console.log("[Monday OAuth] Exchanging code for token...");
 
-  const response = await fetch("https://auth.monday.com/oauth2/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      code,
-      client_id: MONDAY_CLIENT_ID,
-      client_secret: MONDAY_CLIENT_SECRET,
-      redirect_uri: redirectUri,
-    }),
-  });
+  const body = new URLSearchParams({
+    code,
+    client_id: MONDAY_CLIENT_ID,
+    client_secret: MONDAY_CLIENT_SECRET,
+    redirect_uri: redirectUri,
+  }).toString();
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("[Monday OAuth] Token exchange failed:", response.status, errorText);
-    throw new Error(`Token exchange failed: ${response.status}`);
+  const response = await httpsRequest(
+    "https://auth.monday.com/oauth2/token",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(body).toString(),
+      },
+    },
+    body
+  );
+
+  if (response.statusCode !== 200) {
+    console.error("[Monday OAuth] Token exchange failed:", response.statusCode, response.body);
+    throw new Error(`Token exchange failed: ${response.statusCode}`);
   }
 
-  const data = await response.json();
+  const data = JSON.parse(response.body);
   console.log("[Monday OAuth] Token exchange successful");
   return data;
 }
@@ -100,48 +143,53 @@ async function exchangeCodeForToken(
 /**
  * Get user info from Monday API
  */
-async function getMondayUser(accessToken: string): Promise<MondayUserResponse> {
+async function getMondayUser(accessToken: string): Promise<MondayUser> {
   console.log("[Monday OAuth] Fetching user info...");
 
-  const response = await fetch("https://api.monday.com/v2", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: accessToken,
-    },
-    body: JSON.stringify({
-      query: `
-        query {
-          me {
+  const query = JSON.stringify({
+    query: `
+      query {
+        me {
+          id
+          name
+          email
+          photo_thumb_small
+          account {
             id
             name
-            email
-            photo_thumb_small
-            account {
-              id
-              name
-            }
           }
         }
-      `,
-    }),
+      }
+    `,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("[Monday OAuth] Failed to get user:", response.status, errorText);
-    throw new Error(`Failed to get user: ${response.status}`);
+  const response = await httpsRequest(
+    "https://api.monday.com/v2",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accessToken,
+        "Content-Length": Buffer.byteLength(query).toString(),
+      },
+    },
+    query
+  );
+
+  if (response.statusCode !== 200) {
+    console.error("[Monday OAuth] Failed to get user:", response.statusCode, response.body);
+    throw new Error(`Failed to get user: ${response.statusCode}`);
   }
 
-  const data = await response.json();
-  
+  const data = JSON.parse(response.body);
+
   if (data.errors) {
     console.error("[Monday OAuth] GraphQL errors:", data.errors);
     throw new Error(`GraphQL error: ${data.errors[0]?.message || "Unknown error"}`);
   }
 
   console.log("[Monday OAuth] User info retrieved:", data.data.me.id);
-  return data;
+  return data.data.me;
 }
 
 /**
@@ -156,7 +204,7 @@ async function createSession(
   accountName: string,
   accessToken: string
 ): Promise<MondaySession> {
-  const sessionId = crypto.randomUUID();
+  const sessionId = generateUUID();
   const now = Date.now();
   const expiresAt = now + 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -173,10 +221,21 @@ async function createSession(
     expiresAt,
   };
 
-  await docClient.send(
-    new PutCommand({
+  await dynamodb.send(
+    new PutItemCommand({
       TableName: MONDAY_SESSIONS_TABLE,
-      Item: session,
+      Item: {
+        sessionId: { S: sessionId },
+        mondayUserId: { S: mondayUserId },
+        mondayAccountId: { S: mondayAccountId },
+        userName: { S: userName },
+        userEmail: { S: userEmail },
+        ...(userPhoto && { userPhoto: { S: userPhoto } }),
+        accountName: { S: accountName },
+        accessToken: { S: accessToken },
+        createdAt: { N: now.toString() },
+        expiresAt: { N: expiresAt.toString() },
+      },
     })
   );
 
@@ -188,10 +247,10 @@ async function createSession(
  * Get session by ID
  */
 async function getSession(sessionId: string): Promise<MondaySession | null> {
-  const result = await docClient.send(
-    new GetCommand({
+  const result = await dynamodb.send(
+    new GetItemCommand({
       TableName: MONDAY_SESSIONS_TABLE,
-      Key: { sessionId },
+      Key: { sessionId: { S: sessionId } },
     })
   );
 
@@ -199,16 +258,28 @@ async function getSession(sessionId: string): Promise<MondaySession | null> {
     return null;
   }
 
-  const session = result.Item as MondaySession;
+  const item = result.Item;
+  const expiresAt = parseInt(item.expiresAt?.N || "0");
 
   // Check if expired
-  if (session.expiresAt < Date.now()) {
+  if (expiresAt < Date.now()) {
     console.log("[Monday OAuth] Session expired:", sessionId);
     await deleteSession(sessionId);
     return null;
   }
 
-  return session;
+  return {
+    sessionId: item.sessionId?.S || "",
+    mondayUserId: item.mondayUserId?.S || "",
+    mondayAccountId: item.mondayAccountId?.S || "",
+    userName: item.userName?.S || "",
+    userEmail: item.userEmail?.S || "",
+    userPhoto: item.userPhoto?.S,
+    accountName: item.accountName?.S || "",
+    accessToken: item.accessToken?.S || "",
+    createdAt: parseInt(item.createdAt?.N || "0"),
+    expiresAt,
+  };
 }
 
 /**
@@ -218,13 +289,13 @@ async function getSessionByMondayUserId(
   mondayUserId: string
 ): Promise<MondaySession | null> {
   try {
-    const result = await docClient.send(
+    const result = await dynamodb.send(
       new QueryCommand({
         TableName: MONDAY_SESSIONS_TABLE,
         IndexName: "mondayUserId-index",
         KeyConditionExpression: "mondayUserId = :uid",
         ExpressionAttributeValues: {
-          ":uid": mondayUserId,
+          ":uid": { S: mondayUserId },
         },
         Limit: 1,
       })
@@ -234,16 +305,31 @@ async function getSessionByMondayUserId(
       return null;
     }
 
-    const session = result.Items[0] as MondaySession;
+    const item = result.Items[0];
+    const expiresAt = parseInt(item.expiresAt?.N || "0");
 
     // Check if expired
-    if (session.expiresAt < Date.now()) {
+    if (expiresAt < Date.now()) {
       console.log("[Monday OAuth] Session expired for user:", mondayUserId);
-      await deleteSession(session.sessionId);
+      const sessionId = item.sessionId?.S;
+      if (sessionId) {
+        await deleteSession(sessionId);
+      }
       return null;
     }
 
-    return session;
+    return {
+      sessionId: item.sessionId?.S || "",
+      mondayUserId: item.mondayUserId?.S || "",
+      mondayAccountId: item.mondayAccountId?.S || "",
+      userName: item.userName?.S || "",
+      userEmail: item.userEmail?.S || "",
+      userPhoto: item.userPhoto?.S,
+      accountName: item.accountName?.S || "",
+      accessToken: item.accessToken?.S || "",
+      createdAt: parseInt(item.createdAt?.N || "0"),
+      expiresAt,
+    };
   } catch (error) {
     console.error("[Monday OAuth] Error getting session by user ID:", error);
     return null;
@@ -254,10 +340,10 @@ async function getSessionByMondayUserId(
  * Delete session
  */
 async function deleteSession(sessionId: string): Promise<void> {
-  await docClient.send(
-    new DeleteCommand({
+  await dynamodb.send(
+    new DeleteItemCommand({
       TableName: MONDAY_SESSIONS_TABLE,
-      Key: { sessionId },
+      Key: { sessionId: { S: sessionId } },
     })
   );
   console.log("[Monday OAuth] Session deleted:", sessionId);
@@ -266,16 +352,7 @@ async function deleteSession(sessionId: string): Promise<void> {
 /**
  * Main Lambda handler
  */
-export const handler = async (event: {
-  httpMethod?: string;
-  requestContext?: { http?: { method?: string } };
-  body?: string;
-  headers?: Record<string, string>;
-}): Promise<{
-  statusCode: number;
-  headers: Record<string, string>;
-  body: string;
-}> => {
+export const handler: Handler = async (event) => {
   const method = event.httpMethod || event.requestContext?.http?.method || "GET";
 
   // Handle CORS preflight
@@ -310,8 +387,7 @@ export const handler = async (event: {
         const tokenData = await exchangeCodeForToken(code, redirect_uri);
 
         // Get user info
-        const userResponse = await getMondayUser(tokenData.access_token);
-        const user = userResponse.data.me;
+        const user = await getMondayUser(tokenData.access_token);
 
         // Create session
         const session = await createSession(
@@ -463,4 +539,3 @@ export const handler = async (event: {
     };
   }
 };
-
