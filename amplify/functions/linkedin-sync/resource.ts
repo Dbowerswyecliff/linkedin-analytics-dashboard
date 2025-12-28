@@ -8,7 +8,7 @@ import { defineFunction, secret } from "@aws-amplify/backend";
 export const linkedinSync = defineFunction({
   name: "linkedin-sync",
   entry: "./handler.ts",
-  timeoutSeconds: 300, // 5 minutes (sync can take time for many users)
+  timeoutSeconds: 301, // Bumped to force update for secrets
   memoryMB: 512,
   environment: {
     // LinkedIn App credentials

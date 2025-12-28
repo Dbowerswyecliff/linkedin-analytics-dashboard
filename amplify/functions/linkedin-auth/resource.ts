@@ -3,7 +3,7 @@ import { defineFunction, secret } from "@aws-amplify/backend";
 export const linkedinAuth = defineFunction({
   name: "linkedin-auth",
   entry: "./handler.ts",
-  timeoutSeconds: 30, // Updated to pick up new encryption key
+  timeoutSeconds: 31, // Bumped from 30 to force a backend redeploy for secrets
   environment: {
     // LinkedIn Community Management App (Analytics + Profile)
     LINKEDIN_CLIENT_ID: "86hknid4qlugd1",
