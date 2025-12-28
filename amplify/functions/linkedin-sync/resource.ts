@@ -15,10 +15,8 @@ export const linkedinSync = defineFunction({
     LINKEDIN_CLIENT_ID: "86hknid4qlugd1",
     LINKEDIN_CLIENT_SECRET: secret("LINKEDIN_CLIENT_SECRET"),
     
-    // DynamoDB table names (set by Amplify)
-    LINKEDIN_TOKENS_TABLE: "LinkedInTokens",
-    LINKEDIN_ANALYTICS_TABLE: "LinkedInAnalytics",
-    SYNC_LOG_TABLE: "SyncLog",
+    // DynamoDB table names are set dynamically by backend.ts
+    // DO NOT hardcode table names here - Amplify generates unique names
     
     // Encryption key for token decryption
     TOKEN_ENCRYPTION_KEY: secret("TOKEN_ENCRYPTION_KEY"),
