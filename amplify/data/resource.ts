@@ -76,15 +76,17 @@ const schema = a.schema({
       profilePicture: a.string(),
       
       // Aggregated metrics for the period
-      totalImpressions: a.integer(),
-      totalEngagements: a.integer(),
-      totalReactions: a.integer(),
-      totalComments: a.integer(),
-      totalShares: a.integer(),
-      uniqueViews: a.integer(),
+      totalImpressions: a.integer(),                  // Total post impressions
+      totalEngagements: a.integer(),                  // Total engagements (likes + comments + shares + clicks)
+      totalReactions: a.integer(),                    // Total likes/reactions
+      totalComments: a.integer(),                     // Total comments
+      totalShares: a.integer(),                       // Total reshares
+      totalClicks: a.integer(),                       // Total link clicks
+      uniqueViews: a.integer(),                       // Unique viewers
+      postCount: a.integer(),                         // Number of posts in date range
       
       // Raw LinkedIn API response (JSON string)
-      rawAnalyticsData: a.string(),                   // JSON stringified response
+      rawAnalyticsData: a.string(),                   // JSON stringified posts + statistics
     })
     .identifier(['id'])
     .secondaryIndexes((index) => [

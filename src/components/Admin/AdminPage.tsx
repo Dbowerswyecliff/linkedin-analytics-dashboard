@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useBoardConfig, useSyncErrors } from '@/hooks/useMondayBoard'
-import { useConnectedEmployees } from '@/hooks/useLinkedInAnalytics'
+import { useBoardConfig } from '@/hooks/useMondayBoard'
+import { useConnectedEmployees, useSyncStatus } from '@/hooks/useLinkedInAnalytics'
 import LinkedInConnect from './LinkedInConnect'
 import EmployeeList from './EmployeeList'
 import SyncStatus from './SyncStatus'
@@ -9,15 +9,13 @@ import './admin.css'
 
 export default function AdminPage() {
   const { data: boardConfig } = useBoardConfig()
-  const { data: errors = [], isLoading: errorsLoading } = useSyncErrors(
-    boardConfig?.weeklyTotalsBoardId ?? null,
-    boardConfig?.postAnalyticsBoardId ?? null
-  )
   const { data: employeeData } = useConnectedEmployees()
+  const { data: syncData } = useSyncStatus()
   
   const [activeTab, setActiveTab] = useState<'employees' | 'connect' | 'sync' | 'upload' | 'help'>('employees')
 
   const connectedCount = employeeData?.connectedCount || 0
+  const hasErrors = (syncData?.latestSync?.errorCount || 0) > 0
 
   return (
     <div className="admin-page">
@@ -44,8 +42,8 @@ export default function AdminPage() {
           className={`tab-btn ${activeTab === 'sync' ? 'active' : ''}`}
           onClick={() => setActiveTab('sync')}
         >
-          Board Sync
-          {errors.length > 0 && <span className="error-badge">{errors.length}</span>}
+          Analytics Sync
+          {hasErrors && <span className="error-badge">!</span>}
         </button>
         <button
           className={`tab-btn ${activeTab === 'upload' ? 'active' : ''}`}
@@ -69,7 +67,7 @@ export default function AdminPage() {
           <LinkedInConnect />
         )}
         {activeTab === 'sync' && (
-          <SyncStatus errors={errors} isLoading={errorsLoading} />
+          <SyncStatus />
         )}
         {activeTab === 'upload' && (
           <ManualUpload boardConfig={boardConfig} />

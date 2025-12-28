@@ -28,7 +28,9 @@ export interface AnalyticsRecord {
   totalReactions: number;
   totalComments: number;
   totalShares: number;
+  totalClicks: number;
   uniqueViews: number;
+  postCount: number;
 }
 
 export interface SyncLogRecord {
@@ -72,10 +74,14 @@ export interface AggregatedAnalytics {
   totalReactions: number;
   totalComments: number;
   totalShares: number;
+  totalClicks: number;
   uniqueViews: number;
+  totalPosts: number;
   employeeCount: number;
   avgImpressionsPerEmployee: number;
   avgEngagementsPerEmployee: number;
+  avgPostsPerEmployee: number;
+  engagementRate: number;  // Calculated: engagements / impressions
 }
 
 // ============================================
@@ -147,6 +153,10 @@ async function triggerManualSync(): Promise<{
   successCount: number;
   errorCount: number;
 }> {
+  if (!LINKEDIN_SYNC_URL) {
+    throw new Error('Sync URL not configured. Please set VITE_LINKEDIN_SYNC_URL in your environment. Find the URL in AWS Console > Lambda > linkedin-sync function > Configuration > Function URL.');
+  }
+
   const response = await fetch(LINKEDIN_SYNC_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -270,12 +280,14 @@ export function aggregateAnalytics(
 
   const totals = latestRecords.reduce(
     (acc, record) => ({
-      totalImpressions: acc.totalImpressions + record.totalImpressions,
-      totalEngagements: acc.totalEngagements + record.totalEngagements,
-      totalReactions: acc.totalReactions + record.totalReactions,
-      totalComments: acc.totalComments + record.totalComments,
-      totalShares: acc.totalShares + record.totalShares,
-      uniqueViews: acc.uniqueViews + record.uniqueViews,
+      totalImpressions: acc.totalImpressions + (record.totalImpressions || 0),
+      totalEngagements: acc.totalEngagements + (record.totalEngagements || 0),
+      totalReactions: acc.totalReactions + (record.totalReactions || 0),
+      totalComments: acc.totalComments + (record.totalComments || 0),
+      totalShares: acc.totalShares + (record.totalShares || 0),
+      totalClicks: acc.totalClicks + (record.totalClicks || 0),
+      uniqueViews: acc.uniqueViews + (record.uniqueViews || 0),
+      totalPosts: acc.totalPosts + (record.postCount || 0),
     }),
     {
       totalImpressions: 0,
@@ -283,9 +295,16 @@ export function aggregateAnalytics(
       totalReactions: 0,
       totalComments: 0,
       totalShares: 0,
+      totalClicks: 0,
       uniqueViews: 0,
+      totalPosts: 0,
     }
   );
+
+  // Calculate engagement rate (engagements / impressions * 100)
+  const engagementRate = totals.totalImpressions > 0
+    ? (totals.totalEngagements / totals.totalImpressions) * 100
+    : 0;
 
   return {
     ...totals,
@@ -296,6 +315,10 @@ export function aggregateAnalytics(
     avgEngagementsPerEmployee: employeeCount > 0 
       ? Math.round(totals.totalEngagements / employeeCount) 
       : 0,
+    avgPostsPerEmployee: employeeCount > 0
+      ? Math.round((totals.totalPosts / employeeCount) * 10) / 10  // One decimal place
+      : 0,
+    engagementRate: Math.round(engagementRate * 100) / 100,  // Two decimal places
   };
 }
 

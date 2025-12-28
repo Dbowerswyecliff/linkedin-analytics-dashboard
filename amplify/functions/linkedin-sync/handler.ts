@@ -46,22 +46,35 @@ interface SyncResult {
   engagements?: number;
 }
 
-interface LinkedInAnalyticsResponse {
-  elements?: Array<{
-    totalShareStatistics?: {
-      impressionCount?: number;
-      uniqueImpressionsCount?: number;
-      likeCount?: number;
-      commentCount?: number;
-      shareCount?: number;
-      engagement?: number;
-      clickCount?: number;
-    };
-    organizationalEntity?: string;
-    share?: string;
-  }>;
-  paging?: {
-    total?: number;
+interface LinkedInPost {
+  id: string;        // URN of the post (e.g., urn:li:share:xxx or urn:li:ugcPost:xxx)
+  created?: number;  // Timestamp
+  text?: string;     // Post content
+}
+
+interface PostStatistics {
+  postUrn: string;
+  impressionCount: number;
+  uniqueImpressionsCount: number;
+  clickCount: number;
+  likeCount: number;
+  commentCount: number;
+  shareCount: number;
+  engagementCount: number;
+}
+
+interface MemberAnalyticsResult {
+  posts: LinkedInPost[];
+  statistics: PostStatistics[];
+  totals: {
+    totalImpressions: number;
+    uniqueViews: number;
+    totalClicks: number;
+    totalReactions: number;
+    totalComments: number;
+    totalShares: number;
+    totalEngagements: number;
+    postCount: number;
   };
 }
 
@@ -197,29 +210,19 @@ async function getValidAccessToken(record: TokenRecord): Promise<string> {
 }
 
 /**
- * Fetch LinkedIn member analytics using the organizationShareStatistics API
- * Note: This uses the r_member_postAnalytics scope
+ * Make an HTTPS request to LinkedIn API
  */
-async function fetchLinkedInAnalytics(
+function linkedInApiRequest<T>(
   accessToken: string,
-  linkedInId: string,
-  startDate: string,
-  endDate: string
-): Promise<LinkedInAnalyticsResponse> {
+  path: string,
+  method: string = 'GET'
+): Promise<{ statusCode: number; data: T }> {
   return new Promise((resolve, reject) => {
-    // Convert dates to milliseconds for LinkedIn API
-    const startMs = new Date(startDate).getTime();
-    const endMs = new Date(endDate).getTime();
-    
-    // Use the shares endpoint to get post statistics
-    // The r_member_postAnalytics scope allows querying share statistics
-    const path = `/v2/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${encodeURIComponent(linkedInId)}&timeIntervals.timeGranularityType=DAY&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
-
     const options = {
       hostname: 'api.linkedin.com',
       port: 443,
       path,
-      method: 'GET',
+      method,
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'X-Restli-Protocol-Version': '2.0.0',
@@ -227,28 +230,15 @@ async function fetchLinkedInAnalytics(
       },
     };
 
-    console.log(`[Sync] Fetching analytics from: ${path}`);
-
     const req = https.request(options, (res) => {
       let data = '';
       res.on('data', (chunk: Buffer) => { data += chunk; });
       res.on('end', () => {
-        console.log(`[Sync] LinkedIn API response status: ${res.statusCode}`);
-        
-        if (res.statusCode === 200) {
-          try {
-            resolve(JSON.parse(data));
-          } catch {
-            reject(new Error('Failed to parse LinkedIn response'));
-          }
-        } else if (res.statusCode === 403) {
-          // Try alternative endpoint for member share statistics
-          fetchMemberShareStatistics(accessToken, linkedInId, startDate, endDate)
-            .then(resolve)
-            .catch(reject);
-        } else {
-          console.error(`[Sync] LinkedIn API error: ${data}`);
-          reject(new Error(`LinkedIn API error: ${res.statusCode}`));
+        try {
+          const parsed = JSON.parse(data);
+          resolve({ statusCode: res.statusCode || 500, data: parsed });
+        } catch {
+          reject(new Error(`Failed to parse LinkedIn response: ${data.substring(0, 200)}`));
         }
       });
     });
@@ -259,66 +249,223 @@ async function fetchLinkedInAnalytics(
 }
 
 /**
- * Alternative: Fetch member share statistics directly
+ * Fetch member's posts using the posts API
+ * Uses the Community Management API / r_member_postAnalytics scope
  */
-async function fetchMemberShareStatistics(
+async function fetchMemberPosts(
   accessToken: string,
   linkedInId: string,
-  _startDate: string,
-  _endDate: string
-): Promise<LinkedInAnalyticsResponse> {
-  return new Promise((resolve, reject) => {
-    // Get posts/shares by the member
-    const authorUrn = `urn:li:person:${linkedInId.replace('urn:li:person:', '')}`;
-    const path = `/v2/shares?q=owners&owners=${encodeURIComponent(authorUrn)}&count=50`;
+  startDate: string,
+  endDate: string
+): Promise<LinkedInPost[]> {
+  // Normalize the person URN
+  const personUrn = linkedInId.startsWith('urn:li:person:') 
+    ? linkedInId 
+    : `urn:li:person:${linkedInId}`;
+  
+  const startMs = new Date(startDate).getTime();
+  const endMs = new Date(endDate).getTime();
+  
+  console.log(`[Sync] Fetching posts for ${personUrn} from ${startDate} to ${endDate}`);
+  
+  // Try the posts API first (newer endpoint)
+  const postsPath = `/rest/posts?author=${encodeURIComponent(personUrn)}&q=author&count=100`;
+  
+  try {
+    const result = await linkedInApiRequest<{
+      elements?: Array<{
+        id: string;
+        createdAt?: number;
+        commentary?: string;
+        content?: { article?: { title?: string } };
+      }>;
+    }>(accessToken, postsPath);
+    
+    console.log(`[Sync] Posts API response: ${result.statusCode}`);
+    
+    if (result.statusCode === 200 && result.data.elements) {
+      // Filter posts within date range
+      return result.data.elements
+        .filter(post => {
+          const createdAt = post.createdAt || 0;
+          return createdAt >= startMs && createdAt <= endMs;
+        })
+        .map(post => ({
+          id: post.id,
+          created: post.createdAt,
+          text: post.commentary || post.content?.article?.title,
+        }));
+    }
+  } catch (err) {
+    console.log(`[Sync] Posts API failed, trying shares API:`, err);
+  }
+  
+  // Fallback to shares API (older endpoint)
+  const sharesPath = `/v2/shares?q=owners&owners=${encodeURIComponent(personUrn)}&count=100`;
+  
+  const sharesResult = await linkedInApiRequest<{
+    elements?: Array<{
+      activity?: string;
+      created?: { time?: number };
+      text?: { text?: string };
+    }>;
+  }>(accessToken, sharesPath);
+  
+  console.log(`[Sync] Shares API response: ${sharesResult.statusCode}`);
+  
+  if (sharesResult.statusCode === 200 && sharesResult.data.elements) {
+    return sharesResult.data.elements
+      .filter(share => {
+        const createdAt = share.created?.time || 0;
+        return createdAt >= startMs && createdAt <= endMs;
+      })
+      .map(share => ({
+        id: share.activity || '',
+        created: share.created?.time,
+        text: share.text?.text,
+      }))
+      .filter(post => post.id); // Remove posts without IDs
+  }
+  
+  console.log(`[Sync] No posts found for ${personUrn}`);
+  return [];
+}
 
-    const options = {
-      hostname: 'api.linkedin.com',
-      port: 443,
-      path,
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'X-Restli-Protocol-Version': '2.0.0',
-        'LinkedIn-Version': '202401',
-      },
-    };
-
-    console.log(`[Sync] Fetching member shares from: ${path}`);
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk: Buffer) => { data += chunk; });
-      res.on('end', () => {
-        if (res.statusCode === 200) {
-          try {
-            const sharesData = JSON.parse(data);
-            // Transform shares data into analytics format
-            resolve({
-              elements: sharesData.elements?.map((share: { activity?: string }) => ({
-                share: share.activity,
-                totalShareStatistics: {
-                  impressionCount: 0, // Would need separate API call per share
-                  likeCount: 0,
-                  commentCount: 0,
-                  shareCount: 0,
-                },
-              })),
-              paging: sharesData.paging,
-            });
-          } catch {
-            reject(new Error('Failed to parse shares response'));
-          }
-        } else {
-          console.error(`[Sync] Shares API error: ${data}`);
-          reject(new Error(`Shares API error: ${res.statusCode}`));
-        }
-      });
+/**
+ * Fetch social metadata (engagement counts) for posts
+ * Uses the socialMetadata API for batch fetching
+ */
+async function fetchPostEngagement(
+  accessToken: string,
+  postUrns: string[]
+): Promise<Map<string, PostStatistics>> {
+  const statsMap = new Map<string, PostStatistics>();
+  
+  if (postUrns.length === 0) {
+    return statsMap;
+  }
+  
+  // Initialize all posts with zero stats
+  for (const urn of postUrns) {
+    statsMap.set(urn, {
+      postUrn: urn,
+      impressionCount: 0,
+      uniqueImpressionsCount: 0,
+      clickCount: 0,
+      likeCount: 0,
+      commentCount: 0,
+      shareCount: 0,
+      engagementCount: 0,
     });
+  }
+  
+  // Try to fetch social actions for each post (batch if possible)
+  // LinkedIn's socialActions endpoint gets likes, comments, shares
+  for (const postUrn of postUrns) {
+    try {
+      // Get social action summary
+      const summaryPath = `/v2/socialActions/${encodeURIComponent(postUrn)}`;
+      const result = await linkedInApiRequest<{
+        likesSummary?: { totalLikes?: number };
+        commentsSummary?: { totalFirstLevelComments?: number };
+        sharesSummary?: { totalShares?: number };
+      }>(accessToken, summaryPath);
+      
+      if (result.statusCode === 200) {
+        const existing = statsMap.get(postUrn)!;
+        existing.likeCount = result.data.likesSummary?.totalLikes || 0;
+        existing.commentCount = result.data.commentsSummary?.totalFirstLevelComments || 0;
+        existing.shareCount = result.data.sharesSummary?.totalShares || 0;
+        existing.engagementCount = existing.likeCount + existing.commentCount + existing.shareCount;
+      }
+    } catch (err) {
+      console.log(`[Sync] Failed to fetch engagement for ${postUrn}:`, err);
+    }
+  }
+  
+  // Try to fetch impressions via post analytics if available
+  // This requires r_member_postAnalytics scope
+  for (const postUrn of postUrns) {
+    try {
+      const analyticsPath = `/rest/postAnalytics?q=analytics&posts=List(${encodeURIComponent(postUrn)})`;
+      const result = await linkedInApiRequest<{
+        elements?: Array<{
+          post: string;
+          impressionCount?: number;
+          uniqueImpressionsCount?: number;
+          clickCount?: number;
+        }>;
+      }>(accessToken, analyticsPath);
+      
+      if (result.statusCode === 200 && result.data.elements) {
+        for (const analytics of result.data.elements) {
+          const existing = statsMap.get(analytics.post);
+          if (existing) {
+            existing.impressionCount = analytics.impressionCount || 0;
+            existing.uniqueImpressionsCount = analytics.uniqueImpressionsCount || 0;
+            existing.clickCount = analytics.clickCount || 0;
+            existing.engagementCount = existing.likeCount + existing.commentCount + 
+                                       existing.shareCount + existing.clickCount;
+          }
+        }
+      }
+    } catch (err) {
+      console.log(`[Sync] Post analytics not available for ${postUrn}:`, err);
+      // This is expected if r_member_postAnalytics isn't fully approved
+    }
+  }
+  
+  return statsMap;
+}
 
-    req.on('error', reject);
-    req.end();
-  });
+/**
+ * Fetch complete member analytics - posts + engagement
+ */
+async function fetchMemberAnalytics(
+  accessToken: string,
+  linkedInId: string,
+  startDate: string,
+  endDate: string
+): Promise<MemberAnalyticsResult> {
+  console.log(`[Sync] Fetching analytics for ${linkedInId}`);
+  
+  // Step 1: Get member's posts in date range
+  const posts = await fetchMemberPosts(accessToken, linkedInId, startDate, endDate);
+  console.log(`[Sync] Found ${posts.length} posts`);
+  
+  // Step 2: Get engagement stats for each post
+  const postUrns = posts.map(p => p.id).filter(Boolean);
+  const statistics = await fetchPostEngagement(accessToken, postUrns);
+  
+  // Step 3: Calculate totals
+  const totals = {
+    totalImpressions: 0,
+    uniqueViews: 0,
+    totalClicks: 0,
+    totalReactions: 0,
+    totalComments: 0,
+    totalShares: 0,
+    totalEngagements: 0,
+    postCount: posts.length,
+  };
+  
+  for (const stats of statistics.values()) {
+    totals.totalImpressions += stats.impressionCount;
+    totals.uniqueViews += stats.uniqueImpressionsCount;
+    totals.totalClicks += stats.clickCount;
+    totals.totalReactions += stats.likeCount;
+    totals.totalComments += stats.commentCount;
+    totals.totalShares += stats.shareCount;
+    totals.totalEngagements += stats.engagementCount;
+  }
+  
+  console.log(`[Sync] Analytics totals: ${JSON.stringify(totals)}`);
+  
+  return {
+    posts,
+    statistics: Array.from(statistics.values()),
+    totals,
+  };
 }
 
 /**
@@ -326,34 +473,14 @@ async function fetchMemberShareStatistics(
  */
 async function storeAnalytics(
   record: TokenRecord,
-  analytics: LinkedInAnalyticsResponse,
+  analytics: MemberAnalyticsResult,
   dateRangeStart: string,
   dateRangeEnd: string
 ): Promise<void> {
   const now = Date.now();
   const id = `${record.mondayUserId}#${record.linkedInId}#${now}`;
 
-  // Calculate totals from analytics elements
-  let totalImpressions = 0;
-  let totalEngagements = 0;
-  let totalReactions = 0;
-  let totalComments = 0;
-  let totalShares = 0;
-  let uniqueViews = 0;
-
-  if (analytics.elements) {
-    for (const element of analytics.elements) {
-      const stats = element.totalShareStatistics;
-      if (stats) {
-        totalImpressions += stats.impressionCount || 0;
-        uniqueViews += stats.uniqueImpressionsCount || 0;
-        totalReactions += stats.likeCount || 0;
-        totalComments += stats.commentCount || 0;
-        totalShares += stats.shareCount || 0;
-        totalEngagements += (stats.likeCount || 0) + (stats.commentCount || 0) + (stats.shareCount || 0) + (stats.clickCount || 0);
-      }
-    }
-  }
+  const { totals } = analytics;
 
   const item: Record<string, AttributeValue> = {
     id: { S: id },
@@ -362,13 +489,19 @@ async function storeAnalytics(
     syncedAt: { N: String(now) },
     dateRangeStart: { S: dateRangeStart },
     dateRangeEnd: { S: dateRangeEnd },
-    totalImpressions: { N: String(totalImpressions) },
-    totalEngagements: { N: String(totalEngagements) },
-    totalReactions: { N: String(totalReactions) },
-    totalComments: { N: String(totalComments) },
-    totalShares: { N: String(totalShares) },
-    uniqueViews: { N: String(uniqueViews) },
-    rawAnalyticsData: { S: JSON.stringify(analytics) },
+    totalImpressions: { N: String(totals.totalImpressions) },
+    totalEngagements: { N: String(totals.totalEngagements) },
+    totalReactions: { N: String(totals.totalReactions) },
+    totalComments: { N: String(totals.totalComments) },
+    totalShares: { N: String(totals.totalShares) },
+    totalClicks: { N: String(totals.totalClicks) },
+    uniqueViews: { N: String(totals.uniqueViews) },
+    postCount: { N: String(totals.postCount) },
+    // Store per-post statistics for detailed analysis
+    rawAnalyticsData: { S: JSON.stringify({
+      posts: analytics.posts,
+      statistics: analytics.statistics,
+    }) },
   };
 
   // Add profile info if available
@@ -382,7 +515,7 @@ async function storeAnalytics(
     Item: item,
   }));
 
-  console.log(`[Sync] Stored analytics for ${record.mondayUserId}: ${totalImpressions} impressions, ${totalEngagements} engagements`);
+  console.log(`[Sync] Stored analytics for ${record.mondayUserId}: ${totals.totalImpressions} impressions, ${totals.totalEngagements} engagements, ${totals.postCount} posts`);
 }
 
 /**
@@ -525,8 +658,8 @@ async function syncAllUsers(triggerType: 'scheduled' | 'manual'): Promise<{
       // Get valid access token (refresh if needed)
       const accessToken = await getValidAccessToken(record);
 
-      // Fetch analytics from LinkedIn
-      const analytics = await fetchLinkedInAnalytics(
+      // Fetch analytics from LinkedIn using Member Post Analytics API
+      const analytics = await fetchMemberAnalytics(
         accessToken,
         record.linkedInId,
         dateRangeStart,
@@ -536,28 +669,18 @@ async function syncAllUsers(triggerType: 'scheduled' | 'manual'): Promise<{
       // Store in DynamoDB
       await storeAnalytics(record, analytics, dateRangeStart, dateRangeEnd);
 
-      // Calculate summary
-      let totalImpressions = 0;
-      let totalEngagements = 0;
-      if (analytics.elements) {
-        for (const el of analytics.elements) {
-          totalImpressions += el.totalShareStatistics?.impressionCount || 0;
-          totalEngagements += (el.totalShareStatistics?.likeCount || 0) + 
-                            (el.totalShareStatistics?.commentCount || 0) + 
-                            (el.totalShareStatistics?.shareCount || 0);
-        }
-      }
+      const { totals } = analytics;
 
       results.push({
         mondayUserId: record.mondayUserId,
         linkedInId: record.linkedInId,
         success: true,
-        impressions: totalImpressions,
-        engagements: totalEngagements,
+        impressions: totals.totalImpressions,
+        engagements: totals.totalEngagements,
       });
 
-      successDetails.push(`${record.profileFirstName || record.mondayUserId}: ${totalImpressions} impressions`);
-      console.log(`[Sync] Synced ${record.mondayUserId}: ${totalImpressions} impressions`);
+      successDetails.push(`${record.profileFirstName || record.mondayUserId}: ${totals.totalImpressions} impressions, ${totals.postCount} posts`);
+      console.log(`[Sync] Synced ${record.mondayUserId}: ${totals.totalImpressions} impressions, ${totals.postCount} posts`);
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';

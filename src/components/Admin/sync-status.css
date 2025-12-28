@@ -40,8 +40,65 @@
   white-space: nowrap;
 }
 
-.sync-now-btn:hover {
+.sync-now-btn:hover:not(:disabled) {
   background: var(--li-blue);
+}
+
+.sync-now-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Error/Success Banners */
+.sync-error-banner,
+.sync-success-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+}
+
+.sync-error-banner {
+  background: rgba(244, 33, 46, 0.1);
+  border: 1px solid rgba(244, 33, 46, 0.3);
+}
+
+.sync-success-banner {
+  background: rgba(0, 186, 124, 0.1);
+  border: 1px solid rgba(0, 186, 124, 0.3);
+}
+
+.error-icon,
+.success-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.error-content,
+.success-content {
+  flex: 1;
+}
+
+.error-content strong,
+.success-content strong {
+  display: block;
+  margin-bottom: var(--space-xs);
+  color: var(--dash-text);
+}
+
+.error-content p,
+.success-content p {
+  font-size: 0.875rem;
+  color: var(--dash-text-muted);
+  margin: 0;
+}
+
+.error-hint {
+  margin-top: var(--space-sm);
+  font-size: 0.8125rem;
+  opacity: 0.8;
 }
 
 /* Status cards */
@@ -82,6 +139,16 @@
   color: var(--dash-error);
 }
 
+.status-icon.warning {
+  background: rgba(255, 200, 0, 0.15);
+  color: #f5a623;
+}
+
+.status-icon.info {
+  background: rgba(0, 118, 255, 0.15);
+  color: var(--dash-accent);
+}
+
 .status-content {
   display: flex;
   flex-direction: column;
@@ -96,6 +163,46 @@
 .status-label {
   font-size: 0.8125rem;
   color: var(--dash-text-muted);
+}
+
+/* Sync details */
+.sync-details {
+  padding: var(--space-lg);
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-lg);
+}
+
+.sync-details h4 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--dash-text);
+  margin-bottom: var(--space-md);
+}
+
+.details-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-md);
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.detail-item dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--dash-text-muted);
+}
+
+.detail-item dd {
+  font-size: 0.9375rem;
+  color: var(--dash-text);
+  font-weight: 500;
 }
 
 /* Errors section */
@@ -229,6 +336,93 @@
 .retry-btn:hover {
   background: var(--dash-accent);
   color: white;
+}
+
+/* Error messages list */
+.error-messages {
+  list-style: none;
+  padding: var(--space-md) var(--space-lg);
+  margin: 0;
+}
+
+.error-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  font-size: 0.875rem;
+  color: var(--dash-text);
+  border-bottom: 1px solid var(--dash-border);
+}
+
+.error-item:last-child {
+  border-bottom: none;
+}
+
+.error-bullet {
+  color: var(--dash-error);
+  font-weight: bold;
+}
+
+/* API Requirements */
+.api-requirements {
+  padding: var(--space-lg);
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-lg);
+}
+
+.api-requirements h4 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--dash-text);
+  margin-bottom: var(--space-md);
+}
+
+.api-requirements > p {
+  font-size: 0.875rem;
+  color: var(--dash-text-muted);
+  margin-bottom: var(--space-md);
+}
+
+.requirements-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-md) 0;
+}
+
+.requirements-list li {
+  padding: var(--space-sm) 0;
+  font-size: 0.875rem;
+  color: var(--dash-text);
+  border-bottom: 1px solid var(--dash-border);
+}
+
+.requirements-list li:last-child {
+  border-bottom: none;
+}
+
+.requirements-list code {
+  background: var(--dash-surface-elevated);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  color: var(--dash-accent);
+}
+
+.requirements-note {
+  font-size: 0.8125rem;
+  color: var(--dash-text-muted);
+}
+
+.requirements-note a {
+  color: var(--dash-accent);
+  text-decoration: none;
+}
+
+.requirements-note a:hover {
+  text-decoration: underline;
 }
 
 /* Mobile adjustments */
