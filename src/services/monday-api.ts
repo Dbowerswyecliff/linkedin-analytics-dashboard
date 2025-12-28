@@ -7,7 +7,7 @@ const monday = mondaySdk()
 monday.setApiVersion('2024-01')
 
 // Check if we're running inside Monday's iframe
-const isInsideMonday = (): boolean => {
+export const isInsideMonday = (): boolean => {
   try {
     return window.self !== window.top
   } catch {

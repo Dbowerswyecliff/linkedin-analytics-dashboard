@@ -93,22 +93,23 @@ export async function checkMondayContext(): Promise<MondaySession | null> {
     console.log('[MondayAuth] Getting Monday context...');
     const context = await getContext();
     
-    if (!context?.user?.id) {
+    if (!context?.userId) {
       console.log('[MondayAuth] No user in Monday context');
       return null;
     }
     
     // Create a session from Monday context
+    // Note: The Monday SDK context only provides userId, not full user details
     const session: MondaySession = {
-      sessionId: `iframe-${context.user.id}`,
+      sessionId: `iframe-${context.userId}`,
       user: {
-        id: String(context.user.id),
-        name: context.user.name || 'Monday User',
-        email: context.user.email || '',
-        photo: context.user.photo_thumb_small || context.user.photo_thumb,
+        id: String(context.userId),
+        name: 'Monday User', // SDK context doesn't provide name
+        email: '',          // SDK context doesn't provide email
+        photo: undefined,
         account: {
-          id: String(context.account?.id || ''),
-          name: context.account?.name || 'Monday Account',
+          id: context.workspaceId || '',
+          name: 'Monday Account',
         },
       },
       expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
