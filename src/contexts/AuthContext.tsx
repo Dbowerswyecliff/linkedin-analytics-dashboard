@@ -12,6 +12,7 @@ import {
   logout as doLogout,
   exchangeCodeForSession,
   validateOAuthState,
+  loginWithTestCredentials,
   MondaySession,
   MondayUser,
   clearSession,
@@ -26,9 +27,11 @@ interface AuthContextType {
   session: MondaySession | null;
   error: string | null;
   isInsideMonday: boolean;
+  isTestSession: boolean;
   
   // Actions
   login: () => void;
+  loginWithTest: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   handleOAuthCallback: (code: string, state: string) => Promise<void>;
   refreshAuth: () => Promise<void>;
@@ -88,6 +91,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /**
+   * Login with test credentials (for LinkedIn reviewers)
+   */
+  const loginWithTest = useCallback(async (username: string, password: string) => {
+    console.log('[AuthContext] Attempting test login...');
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const session = loginWithTestCredentials(username, password);
+      setSession(session);
+      setUser(session.user);
+      setIsAuthenticated(true);
+      console.log('[AuthContext] Test login successful');
+    } catch (err) {
+      console.error('[AuthContext] Test login error:', err);
+      setError(err instanceof Error ? err.message : 'Login failed');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /**
    * Logout and clear session
    */
   const logout = useCallback(async () => {
@@ -140,6 +166,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await initialize();
   }, [initialize]);
 
+  // Check if current session is a test session (enables demo mode)
+  const isTestSession = session?.source === 'test';
+
   const value: AuthContextType = {
     isAuthenticated,
     isLoading,
@@ -147,7 +176,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     error,
     isInsideMonday: inMonday,
+    isTestSession,
     login,
+    loginWithTest,
     logout,
     handleOAuthCallback,
     refreshAuth,

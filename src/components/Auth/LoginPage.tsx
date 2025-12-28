@@ -2,14 +2,30 @@
  * Login Page
  * 
  * Displays when user is not authenticated and not inside Monday iframe.
- * Provides Monday OAuth login button.
+ * Provides Monday OAuth login button and test login for LinkedIn reviewers.
  */
 
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import './auth.css';
 
 export default function LoginPage() {
-  const { login, isLoading, error } = useAuth();
+  const { login, loginWithTest, isLoading, error } = useAuth();
+  const [showTestLogin, setShowTestLogin] = useState(false);
+  const [testUsername, setTestUsername] = useState('');
+  const [testPassword, setTestPassword] = useState('');
+  const [testError, setTestError] = useState<string | null>(null);
+
+  const handleTestLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTestError(null);
+    
+    try {
+      await loginWithTest(testUsername, testPassword);
+    } catch (err) {
+      setTestError(err instanceof Error ? err.message : 'Login failed');
+    }
+  };
 
   return (
     <div className="login-page">
@@ -57,6 +73,64 @@ export default function LoginPage() {
           )}
         </button>
 
+        <div className="login-divider">
+          <span>or</span>
+        </div>
+
+        <button 
+          className="test-login-toggle"
+          onClick={() => setShowTestLogin(!showTestLogin)}
+          type="button"
+        >
+          {showTestLogin ? 'Hide Reviewer Login' : 'LinkedIn Reviewer? Sign in here'}
+        </button>
+
+        {showTestLogin && (
+          <form className="test-login-form" onSubmit={handleTestLogin}>
+            <p className="test-login-info">
+              For LinkedIn app reviewers only. Use the test credentials provided.
+            </p>
+            
+            {testError && (
+              <div className="login-error">
+                <span>{testError}</span>
+              </div>
+            )}
+            
+            <div className="form-field">
+              <label htmlFor="test-username">Username</label>
+              <input
+                id="test-username"
+                type="text"
+                value={testUsername}
+                onChange={(e) => setTestUsername(e.target.value)}
+                placeholder="Enter test username"
+                autoComplete="username"
+              />
+            </div>
+            
+            <div className="form-field">
+              <label htmlFor="test-password">Password</label>
+              <input
+                id="test-password"
+                type="password"
+                value={testPassword}
+                onChange={(e) => setTestPassword(e.target.value)}
+                placeholder="Enter test password"
+                autoComplete="current-password"
+              />
+            </div>
+            
+            <button 
+              type="submit"
+              className="test-login-btn"
+              disabled={isLoading || !testUsername || !testPassword}
+            >
+              {isLoading ? 'Signing in...' : 'Sign in as Test User'}
+            </button>
+          </form>
+        )}
+
         <p className="login-note">
           This app requires a Monday.com account to track LinkedIn analytics for your team.
         </p>
@@ -64,4 +138,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

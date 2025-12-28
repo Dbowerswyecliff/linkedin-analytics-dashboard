@@ -4,6 +4,39 @@
   gap: var(--space-xl);
 }
 
+/* Demo Mode Banner */
+.demo-mode-banner {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.demo-mode-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.demo-mode-icon {
+  font-size: 1.25rem;
+}
+
+.demo-mode-text {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: #a78bfa;
+  letter-spacing: 0.05em;
+}
+
+.demo-mode-description {
+  color: #c4b5fd;
+  font-size: 0.8125rem;
+}
+
 .dashboard-header {
   animation: slideUp 0.4s ease-out;
   display: flex;

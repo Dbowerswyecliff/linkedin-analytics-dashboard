@@ -9,6 +9,7 @@ import {
   groupAnalyticsByEmployee,
   formatSyncStatus,
 } from '@/hooks/useLinkedInAnalytics'
+import { useIsDemoMode, useDemoAnalytics, useDemoEmployees, useDemoSyncStatus } from '@/hooks/useDemoData'
 import Filters from './Filters'
 import KPICards from './KPICards'
 import WeeklyChart from './WeeklyChart'
@@ -26,16 +27,30 @@ export default function Dashboard() {
   }))
   const [viewMode, setViewMode] = useState<'weekly' | 'employees'>('weekly')
 
+  // Check if we should use demo data
+  const isDemoMode = useIsDemoMode()
+
   // Query parameters
   const queryDateRange = useMemo(() => ({
     start: format(dateRange.start, 'yyyy-MM-dd'),
     end: format(dateRange.end, 'yyyy-MM-dd'),
   }), [dateRange])
 
-  // Fetch analytics from DynamoDB
-  const { data: analyticsData, isLoading: analyticsLoading } = useAllEmployeesAnalytics(queryDateRange)
-  const { data: employeeData } = useConnectedEmployees()
-  const { data: syncData } = useSyncStatus()
+  // Fetch analytics from DynamoDB (real data)
+  const { data: realAnalyticsData, isLoading: realAnalyticsLoading } = useAllEmployeesAnalytics(queryDateRange)
+  const { data: realEmployeeData } = useConnectedEmployees()
+  const { data: realSyncData } = useSyncStatus()
+
+  // Fetch demo data (mock data)
+  const { data: demoAnalyticsData, isLoading: demoAnalyticsLoading } = useDemoAnalytics(queryDateRange)
+  const { data: demoEmployeeData } = useDemoEmployees()
+  const { data: demoSyncData } = useDemoSyncStatus()
+
+  // Use demo or real data based on mode
+  const analyticsData = isDemoMode ? demoAnalyticsData : realAnalyticsData
+  const employeeData = isDemoMode ? demoEmployeeData : realEmployeeData
+  const syncData = isDemoMode ? demoSyncData : realSyncData
+  const analyticsLoading = isDemoMode ? demoAnalyticsLoading : realAnalyticsLoading
 
   // Process analytics data
   const analytics = analyticsData?.analytics || []
@@ -84,6 +99,16 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
+      {isDemoMode && (
+        <div className="demo-mode-banner">
+          <div className="demo-mode-content">
+            <span className="demo-mode-icon">🎬</span>
+            <span className="demo-mode-text">DEMO MODE</span>
+            <span className="demo-mode-description">Showing sample data for demonstration purposes</span>
+          </div>
+        </div>
+      )}
+
       <header className="dashboard-header">
         <div className="header-content">
           <h1>LinkedIn Analytics</h1>
@@ -148,4 +173,3 @@ export default function Dashboard() {
     </div>
   )
 }
-

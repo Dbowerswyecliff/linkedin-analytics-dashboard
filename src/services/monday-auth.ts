@@ -13,6 +13,10 @@ const MONDAY_CLIENT_ID = import.meta.env.VITE_MONDAY_CLIENT_ID || '0518e73d4d009
 const MONDAY_AUTH_FUNCTION_URL = import.meta.env.VITE_MONDAY_AUTH_FUNCTION_URL || '';
 const MONDAY_REDIRECT_URI = `${window.location.origin}/auth/monday/callback`;
 
+// Test credentials for LinkedIn reviewers
+const TEST_USERNAME = import.meta.env.VITE_TEST_USERNAME || 'linkedin_reviewer';
+const TEST_PASSWORD = import.meta.env.VITE_TEST_PASSWORD || 'Demo2024!';
+
 // Session storage key
 const MONDAY_SESSION_KEY = 'monday_session';
 const MONDAY_OAUTH_STATE_KEY = 'monday_oauth_state';
@@ -32,7 +36,7 @@ export interface MondaySession {
   sessionId: string;
   user: MondayUser;
   expiresAt: number;
-  source: 'iframe' | 'oauth';
+  source: 'iframe' | 'oauth' | 'test';
 }
 
 export interface AuthState {
@@ -181,7 +185,13 @@ export async function initializeAuth(): Promise<MondaySession | null> {
   const storedSession = getStoredSession();
   
   if (storedSession) {
-    console.log('[MondayAuth] Found stored session');
+    console.log('[MondayAuth] Found stored session, source:', storedSession.source);
+    
+    // If it's a test session, just use it (no backend validation needed)
+    if (storedSession.source === 'test') {
+      console.log('[MondayAuth] Reusing test session');
+      return storedSession;
+    }
     
     // If it's an iframe session and we're still in iframe, it's valid
     if (storedSession.source === 'iframe' && isInsideMonday()) {
@@ -325,5 +335,47 @@ export function getCurrentSession(): MondaySession | null {
 export function getCurrentUser(): MondayUser | null {
   const session = getStoredSession();
   return session?.user || null;
+}
+
+/**
+ * Login with test credentials (for LinkedIn reviewers)
+ * Returns a test session that enables demo mode
+ */
+export function loginWithTestCredentials(username: string, password: string): MondaySession {
+  console.log('[MondayAuth] Attempting test login...');
+  
+  // Validate credentials
+  if (username !== TEST_USERNAME || password !== TEST_PASSWORD) {
+    throw new Error('Invalid test credentials');
+  }
+  
+  // Create a test session
+  const session: MondaySession = {
+    sessionId: `test-${Date.now()}`,
+    user: {
+      id: 'test-reviewer',
+      name: 'LinkedIn Reviewer',
+      email: 'reviewer@linkedin.com',
+      photo: undefined,
+      account: {
+        id: 'test-account',
+        name: 'Test Account',
+      },
+    },
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+    source: 'test',
+  };
+  
+  console.log('[MondayAuth] Test session created');
+  storeSession(session);
+  return session;
+}
+
+/**
+ * Check if current session is a test session
+ */
+export function isTestSession(): boolean {
+  const session = getStoredSession();
+  return session?.source === 'test';
 }
 
