@@ -57,6 +57,30 @@
   background: rgba(29, 155, 240, 0.1);
 }
 
+/* User display in nav */
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.25rem;
+  background: var(--dash-surface-elevated);
+  border-radius: 20px;
+  border: 1px solid var(--dash-border);
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.user-name {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--dash-text);
+}
+
 /* Main content */
 .app-main {
   flex: 1;

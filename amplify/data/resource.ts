@@ -3,11 +3,12 @@ import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 /**
  * LinkedIn Analytics Schema
  * 
- * Four tables:
+ * Five tables:
  * 1. LinkedInTokens - Stores encrypted LinkedIn tokens per Monday.com user
  * 2. UserSessions - Short-lived session tokens for browser authentication
  * 3. LinkedInAnalytics - Historical analytics snapshots for each user
  * 4. SyncLog - Sync job tracking and status
+ * 5. MondaySessions - Monday.com OAuth sessions for direct URL access
  */
 const schema = a.schema({
   /**
@@ -123,6 +124,32 @@ const schema = a.schema({
     .identifier(['id'])
     .secondaryIndexes((index) => [
       index('startedAt'),                              // Query recent syncs
+    ])
+    .authorization((allow) => [
+      allow.guest().to(['read']),
+    ]),
+
+  /**
+   * MondaySessions Table
+   * Primary Key: sessionId (UUID)
+   * Stores Monday.com OAuth sessions for direct URL access (7 day expiry)
+   */
+  MondaySessions: a
+    .model({
+      sessionId: a.string().required(),                // UUID session identifier (PK)
+      mondayUserId: a.string().required(),             // Monday.com user ID
+      mondayAccountId: a.string().required(),          // Monday.com account ID
+      userName: a.string().required(),                 // User's display name
+      userEmail: a.string().required(),                // User's email
+      userPhoto: a.string(),                           // User's profile photo URL
+      accountName: a.string().required(),              // Monday.com account name
+      accessToken: a.string().required(),              // Monday OAuth access token
+      createdAt: a.integer().required(),               // Session creation timestamp (ms)
+      expiresAt: a.integer().required(),               // Session expiry timestamp (ms)
+    })
+    .identifier(['sessionId'])
+    .secondaryIndexes((index) => [
+      index('mondayUserId'),                           // GSI for user lookup
     ])
     .authorization((allow) => [
       allow.guest().to(['read']),

@@ -3,6 +3,7 @@ import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { linkedinAuth } from './functions/linkedin-auth/resource';
 import { linkedinSync } from './functions/linkedin-sync/resource';
+import { mondayAuth } from './functions/monday-auth/resource';
 import { FunctionUrlAuthType, Function as LambdaFunction } from 'aws-cdk-lib/aws-lambda';
 import { Rule, Schedule } from 'aws-cdk-lib/aws-events';
 import { LambdaFunction as LambdaTarget } from 'aws-cdk-lib/aws-events-targets';
@@ -16,11 +17,13 @@ const backend = defineBackend({
   data,
   linkedinAuth,
   linkedinSync,
+  mondayAuth,
 });
 
 // Get references to resources
 const linkedinAuthLambda = backend.linkedinAuth.resources.lambda;
 const linkedinSyncLambda = backend.linkedinSync.resources.lambda;
+const mondayAuthLambda = backend.mondayAuth.resources.lambda;
 const dataResources = backend.data.resources;
 
 // Get table references from the Data construct
@@ -28,10 +31,12 @@ const linkedInTokensTable = dataResources.tables['LinkedInTokens'];
 const userSessionsTable = dataResources.tables['UserSessions'];
 const linkedInAnalyticsTable = dataResources.tables['LinkedInAnalytics'];
 const syncLogTable = dataResources.tables['SyncLog'];
+const mondaySessionsTable = dataResources.tables['MondaySessions'];
 
 // Cast to full Lambda Function to access addEnvironment
 const authLambdaFn = linkedinAuthLambda as LambdaFunction;
 const syncLambdaFn = linkedinSyncLambda as LambdaFunction;
+const mondayAuthLambdaFn = mondayAuthLambda as LambdaFunction;
 
 // ============================================
 // Auth Lambda Permissions
@@ -58,6 +63,16 @@ if (linkedInAnalyticsTable) {
 if (syncLogTable) {
   syncLogTable.grantReadData(linkedinAuthLambda);
   authLambdaFn.addEnvironment('SYNC_LOG_TABLE', syncLogTable.tableName);
+}
+
+// ============================================
+// Monday Auth Lambda Permissions
+// ============================================
+
+// Grant Monday Auth Lambda access to Monday sessions table
+if (mondaySessionsTable) {
+  mondaySessionsTable.grantReadWriteData(mondayAuthLambda);
+  mondayAuthLambdaFn.addEnvironment('MONDAY_SESSIONS_TABLE', mondaySessionsTable.tableName);
 }
 
 // ============================================
@@ -112,10 +127,16 @@ const syncFnUrl = linkedinSyncLambda.addFunctionUrl({
   authType: FunctionUrlAuthType.NONE,
 });
 
+// Create a public Function URL for Monday OAuth handler
+const mondayAuthFnUrl = mondayAuthLambda.addFunctionUrl({
+  authType: FunctionUrlAuthType.NONE,
+});
+
 // Output the function URLs
 backend.addOutput({
   custom: {
     linkedinAuthUrl: authFnUrl.url,
     linkedinSyncUrl: syncFnUrl.url,
+    mondayAuthUrl: mondayAuthFnUrl.url,
   },
 });
