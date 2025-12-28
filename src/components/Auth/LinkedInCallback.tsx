@@ -20,6 +20,11 @@ export default function LinkedInCallback() {
   const hasRun = useRef(false)
 
   useEffect(() => {
+    // #region agent log
+    console.log('[DEBUG] LinkedInCallback mounted', { pathname: window.location.pathname });
+    fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'oauth-debug-1',runId:'mount',hypothesisId:'H2',location:'LinkedInCallback.tsx:useEffect',message:'mounted',data:{pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
     // Prevent multiple executions (React strict mode, hot reload, etc.)
     if (hasRun.current) {
       console.log('[OAuth Callback] Already executed, skipping duplicate call');
@@ -28,24 +33,29 @@ export default function LinkedInCallback() {
     hasRun.current = true;
     
     const handleCallback = async () => {
-      console.log('[OAuth Callback] Starting callback handler', {
-        url: window.location.href,
-        hasOpener: !!window.opener,
-      });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'src/components/Auth/LinkedInCallback.tsx:useEffect',message:'callback_loaded',data:{pathname:window.location.pathname,hasOpener:!!window.opener},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      
       const code = searchParams.get('code')
       const state = searchParams.get('state')
       const error = searchParams.get('error')
       const errorDescription = searchParams.get('error_description')
       
+      const savedState = localStorage.getItem('linkedin_oauth_state');
+      
+      // #region agent log
+      console.log('[DEBUG] Callback received:', { 
+        url: window.location.href,
+        receivedState: state?.substring(0, 10), 
+        savedState: savedState?.substring(0, 10),
+        match: state === savedState,
+        hasOpener: !!window.opener
+      });
+      fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'oauth-debug-1',runId:'callback',hypothesisId:'H1',location:'LinkedInCallback.tsx:handleCallback',message:'callback_params',data:{receivedState:state?.substring(0, 10),savedState:savedState?.substring(0, 10),match:state === savedState},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+
       console.log('[OAuth Callback] Params:', { 
         code: code?.substring(0, 10) + '...', 
         state: state?.substring(0, 10) + '...', 
         error,
-        localStorageState: localStorage.getItem('linkedin_oauth_state')?.substring(0, 10) + '...',
+        localStorageState: savedState?.substring(0, 10) + '...',
       })
 
       // Handle LinkedIn error response
@@ -79,28 +89,28 @@ export default function LinkedInCallback() {
           )
           setTimeout(() => window.close(), 2000)
         }
-        // No opener: stay on error screen (user can close tab manually)
         return
       }
 
+      // If we're in a popup, send the code and state back to the opener window.
+      // The opener (running in the Monday iframe) will perform the state validation
+      // and token exchange because it has access to the correct localStorage context.
+      if (window.opener) {
+        console.log('[OAuth Callback] Sending parameters to opener');
+        window.opener.postMessage(
+          { type: 'linkedin-auth-callback', code, state },
+          window.location.origin
+        )
+        setStatus('success')
+        // Close popup after a short delay
+        setTimeout(() => window.close(), 1000)
+        return
+      }
+
+      // Fallback for non-popup scenario (e.g. direct tab access)
       try {
         // Exchange code for session (tokens stored server-side)
         const session = await handleLinkedInCallback(code, state)
-        
-        // Store session ID locally
-        storeSession(session.sessionId)
-        
-        setStatus('success')
-        
-        // Post success to opener window with session (NOT tokens)
-        if (window.opener) {
-          window.opener.postMessage(
-            { type: 'linkedin-auth-success', session },
-            window.location.origin
-          )
-          // Close popup after a short delay
-          setTimeout(() => window.close(), 1500)
-        } else {
           // No opener (opened as tab, not popup) - stay on success screen.
           // #region agent log
           fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'src/components/Auth/LinkedInCallback.tsx:handleCallback',message:'success_no_opener_redirecting',data:{pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});

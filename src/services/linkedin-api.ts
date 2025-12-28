@@ -84,6 +84,15 @@ export function initiateLinkedInAuth(mondayUserId: string): Promise<SessionRespo
     localStorage.setItem(OAUTH_STATE_KEY, state);
     localStorage.setItem(OAUTH_STATE_TIMESTAMP_KEY, Date.now().toString());
     
+    // #region agent log
+    console.log('[DEBUG] State saved to localStorage:', {
+      key: OAUTH_STATE_KEY,
+      value: state.substring(0, 10) + '...',
+      mondayUserId
+    });
+    fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'oauth-debug-1',runId:'init',hypothesisId:'H1',location:'linkedin-api.ts:initiateLinkedInAuth',message:'state_saved',data:{state:state.substring(0, 10),mondayUserId},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
     console.log('[OAuth] State set:', {
       nonce: stateData.nonce.substring(0, 8) + '...',
       mondayUserId,
@@ -118,28 +127,42 @@ export function initiateLinkedInAuth(mondayUserId: string): Promise<SessionRespo
     }
 
     // Listen for message from popup
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = async (event: MessageEvent) => {
       // Only accept messages from same origin
       if (event.origin !== window.location.origin) {
         console.warn('[OAuth] Ignored message from foreign origin:', event.origin);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'src/services/linkedin-api.ts:initiateLinkedInAuth',message:'message_ignored_origin',data:{eventOrigin:event.origin,expectedOrigin:window.location.origin,eventType:(event as any)?.data?.type},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         return;
       }
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'src/services/linkedin-api.ts:initiateLinkedInAuth',message:'message_received',data:{eventOrigin:event.origin,eventType:(event as any)?.data?.type},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       
-      if (event.data?.type === 'linkedin-auth-success') {
+      if (event.data?.type === 'linkedin-auth-callback') {
+        console.log('[OAuth] Received callback parameters from popup, validating state...');
+        const { code, state } = event.data;
+        
+        try {
+          // Perform state validation and token exchange here in the parent window
+          // where localStorage is correctly partitioned for the iframe.
+          const session = await handleLinkedInCallback(code, state);
+          
+          // Store session (not tokens!)
+          storeSession(session.sessionId);
+          
+          window.removeEventListener('message', handleMessage);
+          clearInterval(popupCheckInterval);
+          resolve(session);
+        } catch (error) {
+          console.error('[OAuth] Callback validation failed:', error);
+          window.removeEventListener('message', handleMessage);
+          clearInterval(popupCheckInterval);
+          reject(error instanceof Error ? error : new Error('Authentication failed'));
+        }
+      } else if (event.data?.type === 'linkedin-auth-success') {
+        // This is now a fallback if the popup handles the callback itself
         console.log('[OAuth] Received success message from popup');
         window.removeEventListener('message', handleMessage);
         clearInterval(popupCheckInterval);
         
-        // Store session (not tokens!)
         const sessionData = event.data.session as SessionResponse;
         storeSession(sessionData.sessionId);
-        
         resolve(sessionData);
       } else if (event.data?.type === 'linkedin-auth-error') {
         console.log('[OAuth] Received error message from popup:', event.data.error);
