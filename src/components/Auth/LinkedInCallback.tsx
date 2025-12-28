@@ -54,19 +54,15 @@ export default function LinkedInCallback() {
         setErrorMessage(message)
         setStatus('error')
         
-        // Post error to opener window
+        // Post error to opener window and close
         if (window.opener) {
           window.opener.postMessage(
             { type: 'linkedin-auth-error', error: message },
             window.location.origin
           )
           setTimeout(() => window.close(), 2000)
-        } else {
-          // No opener - redirect to admin page after delay
-          setTimeout(() => {
-            window.location.href = '/admin'
-          }, 3000)
         }
+        // No opener: stay on error screen (user can close tab manually)
         return
       }
 
@@ -82,11 +78,8 @@ export default function LinkedInCallback() {
             window.location.origin
           )
           setTimeout(() => window.close(), 2000)
-        } else {
-          setTimeout(() => {
-            window.location.href = '/admin'
-          }, 3000)
         }
+        // No opener: stay on error screen (user can close tab manually)
         return
       }
 
@@ -125,12 +118,8 @@ export default function LinkedInCallback() {
             window.location.origin
           )
           setTimeout(() => window.close(), 2000)
-        } else {
-          // No opener - redirect to admin page after delay
-          setTimeout(() => {
-            window.location.href = '/admin'
-          }, 3000)
         }
+        // No opener: stay on error screen (user can close tab manually)
       }
     }
 
@@ -189,7 +178,7 @@ export default function LinkedInCallback() {
             Successfully connected!
           </p>
           <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>
-            {window.opener ? 'This window will close automatically...' : 'Redirecting to app...'}
+            {window.opener ? 'This window will close automatically...' : 'You can close this tab and return to Monday.'}
           </p>
           {!window.opener && (
             <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem' }}>
@@ -247,8 +236,24 @@ export default function LinkedInCallback() {
             {errorMessage}
           </p>
           <p style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '0.5rem' }}>
-            {window.opener ? 'This window will close automatically...' : 'Redirecting to app...'}
+            {window.opener ? 'This window will close automatically...' : 'You can close this tab and try again from Monday.'}
           </p>
+          {!window.opener && (
+            <button
+              onClick={() => window.close()}
+              style={{
+                marginTop: '1rem',
+                padding: '0.6rem 0.9rem',
+                borderRadius: '10px',
+                border: '1px solid rgba(255,255,255,0.15)',
+                background: 'rgba(255,255,255,0.06)',
+                color: '#ffffff',
+                cursor: 'pointer',
+              }}
+            >
+              Close this tab
+            </button>
+          )}
         </>
       )}
     </div>

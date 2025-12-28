@@ -5,6 +5,7 @@ import LinkedInConnect from './LinkedInConnect'
 import EmployeeList from './EmployeeList'
 import SyncStatus from './SyncStatus'
 import ManualUpload from './ManualUpload'
+import MondayBoards from './MondayBoards'
 import './admin.css'
 
 export default function AdminPage() {
@@ -12,10 +13,11 @@ export default function AdminPage() {
   const { data: employeeData } = useConnectedEmployees()
   const { data: syncData } = useSyncStatus()
   
-  const [activeTab, setActiveTab] = useState<'employees' | 'connect' | 'sync' | 'upload' | 'help'>('employees')
+  const [activeTab, setActiveTab] = useState<'employees' | 'connect' | 'sync' | 'monday' | 'upload' | 'help'>('employees')
 
   const connectedCount = employeeData?.connectedCount || 0
   const hasErrors = (syncData?.latestSync?.errorCount || 0) > 0
+  const hasBoardsConfigured = !!boardConfig?.weeklyTotalsBoardId && !!boardConfig?.postAnalyticsBoardId
 
   return (
     <div className="admin-page">
@@ -46,6 +48,13 @@ export default function AdminPage() {
           {hasErrors && <span className="error-badge">!</span>}
         </button>
         <button
+          className={`tab-btn ${activeTab === 'monday' ? 'active' : ''}`}
+          onClick={() => setActiveTab('monday')}
+        >
+          Monday
+          {hasBoardsConfigured && <span className="success-badge">✓</span>}
+        </button>
+        <button
           className={`tab-btn ${activeTab === 'upload' ? 'active' : ''}`}
           onClick={() => setActiveTab('upload')}
         >
@@ -68,6 +77,9 @@ export default function AdminPage() {
         )}
         {activeTab === 'sync' && (
           <SyncStatus />
+        )}
+        {activeTab === 'monday' && (
+          <MondayBoards />
         )}
         {activeTab === 'upload' && (
           <ManualUpload boardConfig={boardConfig} />

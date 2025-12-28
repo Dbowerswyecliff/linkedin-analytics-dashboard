@@ -3,14 +3,11 @@ import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router
 import { monday } from '@/services/monday-api'
 import Dashboard from '@/components/Dashboard'
 import AdminPage from '@/components/Admin/AdminPage'
-import SetupPage from '@/components/Setup/SetupPage'
 import LinkedInCallback from '@/components/Auth/LinkedInCallback'
-import { useBoardConfig } from '@/hooks/useMondayBoard'
 import './styles/app.css'
 
 function App() {
   const [isReady, setIsReady] = useState(false)
-  const { data: boardConfig, isLoading: configLoading } = useBoardConfig()
 
   useEffect(() => {
     // Listen for Monday SDK ready
@@ -23,10 +20,7 @@ function App() {
     return () => clearTimeout(timeout)
   }, [])
 
-  // If boards aren't set up yet, show setup
-  const needsSetup = !boardConfig?.weeklyTotalsBoardId || !boardConfig?.postAnalyticsBoardId
-
-  if (!isReady || configLoading) {
+  if (!isReady) {
     return (
       <div className="loading-screen">
         <div className="loading-spinner" />
@@ -37,34 +31,21 @@ function App() {
 
   return (
     <BrowserRouter>
-      <AppRoutes needsSetup={needsSetup} />
+      <AppRoutes />
     </BrowserRouter>
   )
 }
 
 // Separate component to use useLocation inside BrowserRouter
-function AppRoutes({ needsSetup }: { needsSetup: boolean }) {
+function AppRoutes() {
   const location = useLocation()
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'src/App.tsx:AppRoutes',message:'route_eval',data:{pathname:location.pathname,needsSetup},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   
-  // OAuth callback route - render without app shell
+  // OAuth callback route - render without app shell (handles popup/redirect scenarios)
   if (location.pathname === '/auth/linkedin/callback' || location.pathname === '/auth/linkedin/callback/') {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'src/App.tsx:AppRoutes',message:'route_branch_callback_exact',data:{pathname:location.pathname},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     return <LinkedInCallback />
   }
 
-  // Setup page - render without app shell
-  if (needsSetup) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'src/App.tsx:AppRoutes',message:'route_branch_setup',data:{pathname:location.pathname},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    return <SetupPage />
-  }
-
+  // Dashboard is always the default home - no setup gating
   return (
     <div className="app-container">
       <nav className="app-nav">
