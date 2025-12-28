@@ -32,6 +32,9 @@ export default function LinkedInCallback() {
         url: window.location.href,
         hasOpener: !!window.opener,
       });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'src/components/Auth/LinkedInCallback.tsx:useEffect',message:'callback_loaded',data:{pathname:window.location.pathname,hasOpener:!!window.opener},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       
       const code = searchParams.get('code')
       const state = searchParams.get('state')
@@ -106,6 +109,9 @@ export default function LinkedInCallback() {
           setTimeout(() => window.close(), 1500)
         } else {
           // No opener (opened as tab, not popup) - redirect to admin page
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'src/components/Auth/LinkedInCallback.tsx:handleCallback',message:'success_no_opener_redirecting',data:{pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           setTimeout(() => {
             window.location.href = '/admin'
           }, 1500)

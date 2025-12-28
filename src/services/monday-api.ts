@@ -63,11 +63,17 @@ export async function getContext(): Promise<{ boardId?: string; workspaceId?: st
  * Used to associate LinkedIn tokens with the user
  */
 export async function getMondayUserId(): Promise<string> {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H3',location:'src/services/monday-api.ts:getMondayUserId',message:'getMondayUserId_entry',data:{isDev,insideMonday:isInsideMonday()},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   // In dev mode outside Monday, use a mock user ID
   if (isDev && !isInsideMonday()) {
     const devUserId = localStorage.getItem('dev-mondayUserId') || 'dev-user-' + Date.now()
     localStorage.setItem('dev-mondayUserId', devUserId)
     console.log('[DEV] Using mock Monday user ID:', devUserId)
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H3',location:'src/services/monday-api.ts:getMondayUserId',message:'getMondayUserId_dev_id',data:{idPrefix:String(devUserId).slice(0,8)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     return devUserId
   }
 
@@ -77,6 +83,9 @@ export async function getMondayUserId(): Promise<string> {
       if (data?.user?.id) {
         // Handle both number and string user IDs
         const userId = typeof data.user.id === 'number' ? String(data.user.id) : data.user.id
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H3',location:'src/services/monday-api.ts:getMondayUserId',message:'getMondayUserId_ctx_id',data:{idPrefix:String(userId).slice(0,6),idType:typeof data.user.id},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         resolve(userId)
       } else {
         reject(new Error('Could not get Monday.com user ID'))
