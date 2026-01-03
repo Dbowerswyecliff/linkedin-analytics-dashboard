@@ -1,9 +1,13 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { configureAmplify } from './config/amplify'
 import App from './App'
 import './styles/global.css'
 import '@vibe/core/tokens'
+
+// Configure AWS Amplify
+configureAmplify()
 
 const queryClient = new QueryClient({
   defaultOptions: {
