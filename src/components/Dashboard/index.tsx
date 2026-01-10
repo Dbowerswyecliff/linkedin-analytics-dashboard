@@ -13,7 +13,7 @@ import { useIsDemoMode, useDemoAnalytics, useDemoEmployees, useDemoSyncStatus } 
 import Filters from './Filters'
 import KPICards from './KPICards'
 import WeeklyChart from './WeeklyChart'
-import TopEmployeesChart from './TopEmployeesChart'
+import EmployeeLeaderboard from './EmployeeLeaderboard'
 import AnalyticsTable from './AnalyticsTable'
 import SyncStatusBanner from './SyncStatusBanner'
 import EmptyState from '../shared/EmptyState'
@@ -150,7 +150,7 @@ export default function Dashboard() {
 
           <div className="charts-grid">
             <WeeklyChart data={weeklyChartData} />
-            <TopEmployeesChart employees={employeeRanking.slice(0, 5)} />
+            <EmployeeLeaderboard employees={employeeRanking} />
           </div>
 
           <div className="tables-section">

@@ -263,3 +263,199 @@
   }
 }
 
+/* ============================================
+   Employee Leaderboard
+   ============================================ */
+
+.leaderboard-card {
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  margin-top: 0.75rem;
+  padding-right: 0.25rem;
+}
+
+/* Custom scrollbar for leaderboard */
+.leaderboard-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.leaderboard-list::-webkit-scrollbar-track {
+  background: var(--dash-surface);
+  border-radius: 3px;
+}
+
+.leaderboard-list::-webkit-scrollbar-thumb {
+  background: var(--dash-border);
+  border-radius: 3px;
+}
+
+.leaderboard-list::-webkit-scrollbar-thumb:hover {
+  background: var(--dash-text-muted);
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--dash-surface-elevated);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.leaderboard-item:hover {
+  transform: translateX(4px);
+  border-color: var(--dash-accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Top 3 special styling */
+.leaderboard-item.top-1 {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%);
+  border-color: rgba(255, 215, 0, 0.3);
+}
+
+.leaderboard-item.top-2 {
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.1) 0%, rgba(192, 192, 192, 0.05) 100%);
+  border-color: rgba(192, 192, 192, 0.3);
+}
+
+.leaderboard-item.top-3 {
+  background: linear-gradient(135deg, rgba(205, 127, 50, 0.1) 0%, rgba(205, 127, 50, 0.05) 100%);
+  border-color: rgba(205, 127, 50, 0.3);
+}
+
+.leaderboard-position {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--dash-text-muted);
+  flex-shrink: 0;
+}
+
+.leaderboard-position.has-icon {
+  font-size: 1.5rem;
+}
+
+.leaderboard-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.leaderboard-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.leaderboard-avatar .avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.leaderboard-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.leaderboard-name {
+  font-weight: 600;
+  color: var(--dash-text);
+  font-size: 0.9375rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leaderboard-stats {
+  color: var(--dash-text-muted);
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-separator {
+  opacity: 0.5;
+  margin: 0 0.125rem;
+}
+
+.leaderboard-value {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--dash-accent);
+  font-family: 'JetBrains Mono', monospace;
+  flex-shrink: 0;
+}
+
+/* Leaderboard mobile adjustments */
+@media (max-width: 768px) {
+  .leaderboard-card {
+    max-height: 400px;
+  }
+
+  .leaderboard-item {
+    padding: 0.625rem;
+    gap: 0.5rem;
+  }
+
+  .leaderboard-position {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+
+  .leaderboard-position.has-icon {
+    font-size: 1.25rem;
+  }
+
+  .leaderboard-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .leaderboard-avatar .avatar-placeholder {
+    font-size: 0.875rem;
+  }
+
+  .leaderboard-name {
+    font-size: 0.875rem;
+  }
+
+  .leaderboard-stats {
+    font-size: 0.6875rem;
+  }
+
+  .leaderboard-value {
+    font-size: 0.875rem;
+  }
+}
+
