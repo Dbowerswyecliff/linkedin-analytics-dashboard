@@ -20,11 +20,6 @@ export default function LinkedInCallback() {
   const hasRun = useRef(false)
 
   useEffect(() => {
-    // #region agent log
-    console.log('[DEBUG] LinkedInCallback mounted', { pathname: window.location.pathname });
-    fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'oauth-debug-1',runId:'mount',hypothesisId:'H2',location:'LinkedInCallback.tsx:useEffect',message:'mounted',data:{pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     // Prevent multiple executions (React strict mode, hot reload, etc.)
     if (hasRun.current) {
       console.log('[OAuth Callback] Already executed, skipping duplicate call');
@@ -40,17 +35,6 @@ export default function LinkedInCallback() {
       
       const savedState = localStorage.getItem('linkedin_oauth_state');
       
-      // #region agent log
-      console.log('[DEBUG] Callback received:', { 
-        url: window.location.href,
-        receivedState: state?.substring(0, 10), 
-        savedState: savedState?.substring(0, 10),
-        match: state === savedState,
-        hasOpener: !!window.opener
-      });
-      fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'oauth-debug-1',runId:'callback',hypothesisId:'H1',location:'LinkedInCallback.tsx:handleCallback',message:'callback_params',data:{receivedState:state?.substring(0, 10),savedState:savedState?.substring(0, 10),match:state === savedState},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-
       console.log('[OAuth Callback] Params:', { 
         code: code?.substring(0, 10) + '...', 
         state: state?.substring(0, 10) + '...', 

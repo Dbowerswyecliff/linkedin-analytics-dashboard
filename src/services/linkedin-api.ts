@@ -48,9 +48,6 @@ export interface ConnectionStatus {
  */
 export function initiateLinkedInAuth(mondayUserId: string): Promise<SessionResponse> {
   return new Promise((resolve, reject) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'src/services/linkedin-api.ts:initiateLinkedInAuth',message:'oauth_start',data:{origin:window.location.origin,mondayUserIdPrefix:String(mondayUserId).slice(0,6),redirectUri:LINKEDIN_REDIRECT_URI},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!LINKEDIN_CLIENT_ID) {
       reject(new Error('LinkedIn Client ID not configured'));
       return;
@@ -84,15 +81,6 @@ export function initiateLinkedInAuth(mondayUserId: string): Promise<SessionRespo
     localStorage.setItem(OAUTH_STATE_KEY, state);
     localStorage.setItem(OAUTH_STATE_TIMESTAMP_KEY, Date.now().toString());
     
-    // #region agent log
-    console.log('[DEBUG] State saved to localStorage:', {
-      key: OAUTH_STATE_KEY,
-      value: state.substring(0, 10) + '...',
-      mondayUserId
-    });
-    fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'oauth-debug-1',runId:'init',hypothesisId:'H1',location:'linkedin-api.ts:initiateLinkedInAuth',message:'state_saved',data:{state:state.substring(0, 10),mondayUserId},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     console.log('[OAuth] State set:', {
       nonce: stateData.nonce.substring(0, 8) + '...',
       mondayUserId,
@@ -117,10 +105,6 @@ export function initiateLinkedInAuth(mondayUserId: string): Promise<SessionRespo
       'linkedin-auth',
       `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
     );
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/37a99209-83e4-4cc5-b2e7-dc66d713db5d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'src/services/linkedin-api.ts:initiateLinkedInAuth',message:'popup_open_result',data:{popupOpened:!!popup,authUrlOrigin:authUrl.origin,authUrlPath:authUrl.pathname},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     if (!popup) {
       reject(new Error('Failed to open popup. Please allow popups for this site.'));
       return;

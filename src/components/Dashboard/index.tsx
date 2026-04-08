@@ -36,17 +36,18 @@ export default function Dashboard() {
     end: format(dateRange.end, 'yyyy-MM-dd'),
   }), [dateRange])
 
-  // Fetch analytics from DynamoDB (real data)
-  const { data: realAnalyticsData, isLoading: realAnalyticsLoading } = useAllEmployeesAnalytics(queryDateRange)
-  const { data: realEmployeeData } = useConnectedEmployees()
-  const { data: realSyncData } = useSyncStatus()
-
-  // Fetch demo data (mock data)
+  // In demo mode, only use mock data -- no live API calls
   const { data: demoAnalyticsData, isLoading: demoAnalyticsLoading } = useDemoAnalytics(queryDateRange)
   const { data: demoEmployeeData } = useDemoEmployees()
   const { data: demoSyncData } = useDemoSyncStatus()
 
-  // Use demo or real data based on mode
+  // Only start live queries when NOT in demo mode
+  const { data: realAnalyticsData, isLoading: realAnalyticsLoading } = useAllEmployeesAnalytics(
+    isDemoMode ? undefined : queryDateRange
+  )
+  const { data: realEmployeeData } = useConnectedEmployees()
+  const { data: realSyncData } = useSyncStatus()
+
   const analyticsData = isDemoMode ? demoAnalyticsData : realAnalyticsData
   const employeeData = isDemoMode ? demoEmployeeData : realEmployeeData
   const syncData = isDemoMode ? demoSyncData : realSyncData

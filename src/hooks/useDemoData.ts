@@ -1,25 +1,21 @@
 /**
  * Demo data hooks
  * 
- * Provides demo data when:
- * 1. VITE_DEMO_MODE=true environment variable is set
- * 2. User is logged in with test credentials (source === 'test')
+ * Provides demo data when VITE_DEMO_MODE=true environment variable is set.
+ * In demo mode, only mock data is used -- no live API calls are made.
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
 import { mockEmployees, mockAnalytics, mockSyncStatus } from '@/data/mockDemoData';
 import type { AnalyticsRecord, EmployeeRecord, SyncLogRecord } from './useLinkedInAnalytics';
 
-// Check if demo mode is enabled via environment variable
-const IS_ENV_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
+const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
 /**
  * Hook to determine if demo mode should be active
  */
 export function useIsDemoMode(): boolean {
-  const { isTestSession } = useAuth();
-  return IS_ENV_DEMO_MODE || isTestSession;
+  return IS_DEMO_MODE;
 }
 
 /**

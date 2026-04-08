@@ -9,13 +9,13 @@
 import { getContext, isInsideMonday } from './monday-api';
 
 // Environment variables
-const MONDAY_CLIENT_ID = import.meta.env.VITE_MONDAY_CLIENT_ID || '0518e73d4d0095206f01698240f4356b';
+const MONDAY_CLIENT_ID = import.meta.env.VITE_MONDAY_CLIENT_ID || '';
 const MONDAY_AUTH_FUNCTION_URL = import.meta.env.VITE_MONDAY_AUTH_FUNCTION_URL || '';
 const MONDAY_REDIRECT_URI = `${window.location.origin}/auth/monday/callback`;
 
-// Test credentials for LinkedIn reviewers
-const TEST_USERNAME = import.meta.env.VITE_TEST_USERNAME || 'linkedin_reviewer';
-const TEST_PASSWORD = import.meta.env.VITE_TEST_PASSWORD || 'Demo2024!';
+// Test credentials for LinkedIn reviewers (no fallback values in public builds)
+const TEST_USERNAME = import.meta.env.VITE_TEST_USERNAME || '';
+const TEST_PASSWORD = import.meta.env.VITE_TEST_PASSWORD || '';
 
 // Session storage key
 const MONDAY_SESSION_KEY = 'monday_session';
